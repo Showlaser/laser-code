@@ -1,3 +1,6 @@
+#ifndef Dac_H
+#define Dac_H
+
 #include <Arduino.h>
 #include <inttypes.h>
 
@@ -82,3 +85,5 @@ private:
 
 	void write(unsigned int data);
 };
+
+#endif

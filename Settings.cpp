@@ -1,16 +1,10 @@
 #include "Settings.h"
 #include <EEPROM.h>
 
- struct settingsModel {
-    String controllerIp;
-    byte[] maxLaserPowerRgb;
-  };
+Settings::Settings() {};
 
-Settings::Settings(){};
-
-settingsModel getFromEEPROM() {
-  EEPROM.get(0, settingsModel);
-  return settingsModel;
+void Settings::getFromEEPROM(settingsModel& settings) {
+  EEPROM.get(0, "");
 }
 
 /*
@@ -18,6 +12,6 @@ settingsModel getFromEEPROM() {
 *
 * @param settingsModel the model to write to the EEPROM
 */
-void writeToEEPROM(struct model) {
-  EEPROM.put(0, model);
+void Settings::writeToEEPROM(settingsModel& settings) {
+  EEPROM.put(0, "");
 }

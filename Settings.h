@@ -1,15 +1,20 @@
+#ifndef SETTINGS_H
+#define SETTINGS_H
+
 #include "Arduino.h"
+
+struct settingsModel {
+  String controllerIp;
+  byte maxLaserPowerRgb[];
+};
 
 class Settings {
 public:
   Settings();
-  struct settingsModel {
-    String controllerIp;
-    byte maxLaserPowerRgb[];
-  };
-
-  struct settingsModel getFromEEPROM();
-  void writeToEEPROM(struct settingsModel);
+  void getFromEEPROM(settingsModel& settings);
+  void writeToEEPROM(settingsModel& settings);
 
 private:
 };
+
+#endif

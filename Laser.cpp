@@ -9,4 +9,5 @@ Laser::Laser() {}
  * Returns true if the function succeeds, false if it fails
  */
 bool Laser::hardwareSelfCheck() {
+  return true; // for now
 }

@@ -1,3 +1,6 @@
+#ifndef LASER_H
+#define LASER_H
+
 #include "Arduino.h"
 #include <NativeEthernet.h>
 
@@ -8,3 +11,5 @@ class Laser {
 
   private:
 };
+
+#endif
