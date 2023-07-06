@@ -18,9 +18,9 @@ enum laserStatus {
 laserStatus _currentLaserStatus;
 
 /**
- * Generate a MAC address for the Teensy
- *
- * @param mac the variable too write the mac address to
+  @brief Generate a MAC address for the Teensy
+ 
+  @param mac the variable too write the mac address to
  */
 void teensyMAC(uint8_t *mac) {
   for (uint8_t by = 0; by < 2; by++) {
@@ -31,10 +31,10 @@ void teensyMAC(uint8_t *mac) {
   }
 }  // TODO get output from function and put it in a constant variable
 
-/*
- * Sets the status of the laser and performs certain actions based on the status
- *
- * @param status the status of the laser
+/**
+ @brief Sets the status of the laser and performs certain actions based on the status
+ 
+ @param status the status of the laser
  */
 void setLaserStatus(laserStatus status) {
   _currentLaserStatus = status;
@@ -55,10 +55,10 @@ void setLaserStatus(laserStatus status) {
   }
 }
 
-/*
- * This function tries to connect to the provided IP address on port 50000. After 10 tries the function calls the setLaserStatus function
- *
- * @param controllerIp the IP address of the controller to connect to
+/**
+  @brief This function tries to connect to the provided IP address on port 50000. After 10 tries the function calls the setLaserStatus function
+ 
+  @param controllerIp the IP address of the controller to connect to
  */
 void connectToController(String controllerIp) {
   char firstChar = controllerIp.charAt(0);

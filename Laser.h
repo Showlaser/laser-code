@@ -35,6 +35,7 @@ public:
   void init(float scale, long offsetX, long offsetY);
   void sendTo(int x, int y);
   bool hardwareSelfCheck();
+  void setLaserPower(byte red, byte green, byte blue);
 
 private:
   void resetClipArea();
@@ -42,10 +43,18 @@ private:
   void sendToDAC(int x, int y);
   void sendtoRaw(int x, int y);
   int fixBoundary(int input, int min, int max);
+  bool testGalvoFeedback();
+  void testLaserFeedbackForWatchdog();
 
   const byte _redLaserPin = 2;
   const byte _greenLaserPin = 3;
   const byte _blueLaserPin = 4;
+  const byte _safeOperationPin = A2;
+  const byte _yGalvoFeedbackSignal = A3;
+  const byte _xGalvoFeedbackSignal = A4;
+
+  int _realTimeYPos = 0;  // The y position based on the feedback signal from the galvo
+  int _realTimeXPos = 0;  // The x position based on the feedback signal from the galvo
   int _yPos = 0;
   int _xPos = 0;
 
