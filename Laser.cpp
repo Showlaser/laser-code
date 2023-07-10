@@ -84,24 +84,6 @@ void Laser::setClipArea(int x, int y, int x1, int y1) {
 }
 
 /**
-   @brief sets the input value to the max or min value if it goes under or over the min and max values.
-
-   @param input the input variable to fix
-   @param min the minimum allowed value
-   @param max the maximum allowed value
-   @return int the value between or equal to the min or max value
-*/
-int Laser::fixBoundary(int input, int min, int max) {
-  if (input < min) {
-    input = min;
-  }
-  if (input > max) {
-    max = max;
-  }
-  return input;
-}
-
-/**
    @brief sends the mirrors of the galvo to the specified location
 
    @param xpos the position of the x mirror in the galvo
@@ -160,6 +142,28 @@ void Laser::sendtoRaw(int xNew, int yNew) {
 }
 
 /**
+   @brief sets the input value to the max or min value if it goes under or over the min and max values.
+
+   @param input the input variable to fix
+   @param min the minimum allowed value
+   @param max the maximum allowed value
+
+   @return int the value between or equal to the min or max value
+*/
+int Laser::fixBoundary(int input, int min, int max)
+{
+  if (input < min)
+  {
+    return min;
+  }
+  if (input > max)
+  {
+    return max;
+  }
+  return input;
+}
+
+/**
  @brief This function sets the power of the laser by the provided values.
  @brief Values below 0 will be set to 0 and values above 255 will be set to 255
 
@@ -167,10 +171,10 @@ void Laser::sendtoRaw(int xNew, int yNew) {
  @param green the power the green laser should output from 0 / 255
  @param blue the power the blue laser should output from 0 / 255
 */
-void setLaserPower(byte red, byte green, byte blue) {
-  r = fixBoundary(r, 0, 255);
-  g = fixBoundary(g, 0, 255);
-  b = fixBoundary(b, 0, 255);
+void Laser::setLaserPower(byte red, byte green, byte blue) {
+  const byte r = fixBoundary(red, 0, 255);
+  const byte g = fixBoundary(green, 0, 255);
+  const byte b = fixBoundary(blue, 0, 255);
 
   analogWrite(_redLaserPin, r);
   analogWrite(_greenLaserPin, g);
@@ -179,15 +183,20 @@ void setLaserPower(byte red, byte green, byte blue) {
 
 /**
  @brief This function checks if the feedback of the galvo's is working by sending them to their maximums positions and reading the feedback signal from the galvo's.
+
+ @return boolean true if the test succeeded false if the test fails
 */
 bool Laser::testGalvoFeedback() {
+  sendtoRaw(0, 0);
+  delay(100);  // Delay to give the galvo's time to reach the position
+
   sendtoRaw(4000, 4000);
-  delay(10);  // Delay to give the galvo's time to reach the position
+  delay(100);  // Delay to give the galvo's time to reach the position
   const short xPosFeedback = analogRead(_xGalvoFeedbackSignal);
   const short yPosFeedback = analogRead(_yGalvoFeedbackSignal);
 
   sendtoRaw(-4000, -4000);
-  delay(10);  // Delay to give the galvo's time to reach the position
+  delay(100);  // Delay to give the galvo's time to reach the position
   const bool xGalvoFeedbackWorking = abs(xPosFeedback - analogRead(_xGalvoFeedbackSignal)) > 800;
   const bool yGalvoFeedbackWorking = abs(yPosFeedback - analogRead(_yGalvoFeedbackSignal)) > 800;
 
@@ -205,9 +214,9 @@ void Laser::testLaserFeedbackForWatchdog() {
 }
 
 /**
- * Performs a hardware check for the galvo's and the laser readout
+ * @brief Performs a hardware check for the galvo's and the laser readout
  * 
- * Returns true if the function succeeds, false if it fails
+ * @return true if the function succeeds, false if it fails
  */
 bool Laser::hardwareSelfCheck() {
   const bool galvosWorking = testGalvoFeedback();

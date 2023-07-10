@@ -1,9 +1,8 @@
 #include <NativeEthernet.h>
 #include "Laser.h"
-#include "Settings.h"
+#include <EEPROM.h>
 
 Laser _laser;
-Settings _settings;
 
 EthernetClient _client;
 IPAddress _server;
@@ -78,14 +77,41 @@ void connectToController(String controllerIp) {
   }
 }
 
+struct settingsModel {
+  byte controllerIp[4];
+  byte maxPowerRgb[3];
+};
+
+/**
+ @brief Checks if the array objects in the array are not empty
+
+ @param array the array to check
+ @return true if the objects in the array do not have a default value, false if the the objects in the array have a default value
+*/
+bool checkIfArrayIsNotEmpty(byte array[]) {
+  int emptyValueOccurances = 0; 
+  const unsigned int lengthOfArray = sizeof(byte)/sizeof(array[0]);
+  for (unsigned int i = 0; i < lengthOfArray; i++) {
+    if (i == 255) {
+      emptyValueOccurances++;
+    }
+  }
+
+  return emptyValueOccurances != lengthOfArray;
+}
+
 void setup() {
   byte mac[6];
   teensyMAC(mac);
   Ethernet.begin(mac);
 
   settingsModel model;
-  _settings.getFromEEPROM(model);
-  if (model.controllerIp.length() == 0) {
+  EEPROM.get(0, model);
+
+  bool controllerIpIsNotEmpty = checkIfArrayIsNotEmpty(model.controllerIp);
+  bool maxPowerIpIsNotEmpty = checkIfArrayIsNotEmpty(model.maxPowerRgb);
+  bool settingsValid = controllerIpIsNotEmpty && maxPowerIpIsNotEmpty;
+  if (!settingsValid) {
     setLaserStatus(laserStatus::NotConfigured);
   }
 
