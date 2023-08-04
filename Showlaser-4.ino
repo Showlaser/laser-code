@@ -1,6 +1,9 @@
 #include <NativeEthernet.h>
 #include "Laser.h"
 #include <EEPROM.h>
+#include <ArduinoJson.h>  // include before MsgPacketizer.h
+#include <MsgPacketizer.h>
+#include <queue>
 
 Laser _laser;
 
@@ -21,7 +24,7 @@ laserStatus _currentLaserStatus;
  
   @param mac the variable too write the mac address to
  */
-void teensyMAC(uint8_t *mac) {
+void teensyMAC(uint8_t* mac) {
   for (uint8_t by = 0; by < 2; by++) {
     mac[by] = (HW_OCOTP_MAC1 >> ((1 - by) * 8)) & 0xFF;
   }
@@ -89,8 +92,8 @@ struct settingsModel {
  @return true if the objects in the array do not have a default value, false if the the objects in the array have a default value
 */
 bool checkIfArrayIsNotEmpty(byte array[]) {
-  int emptyValueOccurances = 0; 
-  const unsigned int lengthOfArray = sizeof(byte)/sizeof(array[0]);
+  int emptyValueOccurances = 0;
+  const unsigned int lengthOfArray = sizeof(byte) / sizeof(array[0]);
   for (unsigned int i = 0; i < lengthOfArray; i++) {
     if (i == 255) {
       emptyValueOccurances++;
@@ -99,6 +102,17 @@ bool checkIfArrayIsNotEmpty(byte array[]) {
 
   return emptyValueOccurances != lengthOfArray;
 }
+
+struct Message {
+  short X;
+  short Y;
+  short R;
+  short G;
+  short B;
+  MSGPACK_DEFINE(X, Y, R, G, B);
+};
+
+std::queue<Message> queue;
 
 void setup() {
   byte mac[6];
@@ -116,13 +130,15 @@ void setup() {
   }
 
   _laser.hardwareSelfCheck();
+  MsgPacketizer::subscribe(_client, 0,
+                           [&](const Message message) {
+                             queue.push(message);
+                           });
 }
 
 void loop() {
   if (_client.connected()) {
-    // digitalWrite(8, HIGH);
-    // decodeCommands();
-    // executeMessages();
+    MsgPacketizer::update();
   } else {
     // laser.turnLasersOff();
     _client.stop();
