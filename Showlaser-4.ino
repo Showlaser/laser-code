@@ -2,10 +2,11 @@
 #include "Laser.h"
 #include <EEPROM.h>
 #include <ArduinoJson.h>  // include before MsgPacketizer.h
-#include <MsgPacketizer.h>
 #include <queue>
+#include "OledModule.h"
 
 Laser _laser;
+OledModule _oledModule;
 
 EthernetClient _client;
 IPAddress _server;
@@ -103,18 +104,12 @@ bool checkIfArrayIsNotEmpty(byte array[]) {
   return emptyValueOccurances != lengthOfArray;
 }
 
-struct Message {
-  short X;
-  short Y;
-  short R;
-  short G;
-  short B;
-  MSGPACK_DEFINE(X, Y, R, G, B);
-};
-
-std::queue<Message> queue;
-
 void setup() {
+  Serial.begin(9600);
+  while (true) {
+    _oledModule.checkForInput();
+  }
+
   byte mac[6];
   teensyMAC(mac);
   Ethernet.begin(mac);
@@ -130,15 +125,10 @@ void setup() {
   }
 
   _laser.hardwareSelfCheck();
-  MsgPacketizer::subscribe(_client, 0,
-                           [&](const Message message) {
-                             queue.push(message);
-                           });
 }
 
 void loop() {
   if (_client.connected()) {
-    MsgPacketizer::update();
   } else {
     // laser.turnLasersOff();
     _client.stop();
