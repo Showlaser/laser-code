@@ -106,6 +106,8 @@ bool checkIfArrayIsNotEmpty(byte array[]) {
 
 void setup() {
   Serial.begin(9600);
+  Serial.println("Start");
+  _oledModule.init();
   while (true) {
     _oledModule.checkForInput();
   }
