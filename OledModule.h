@@ -1,34 +1,39 @@
 #ifndef OledModule_H
 #define OledModule_H
-#include <Arduino.h>
+
+#include "Arduino.h"
+#include "Settings.h"
 
 class OledModule {
 public:
-  void init();
+  void init(settingsModel &settings);
   void checkForInput();
-  void displayMessage(String message);
+  void setBottomMessage(String message);
 
 private:
-  unsigned short currentSelectedMenuId = 0;
-  unsigned short currentSelectedMenuItemId = 0;
-  unsigned short menuItemsCount = 0;
-  String bottomMessage = "";
+  unsigned short _currentSelectedMenuId = 0;
+  unsigned short _currentSelectedMenuItemId = 0;
+  int _currentSelectedMenuItemValue = -999;
+  unsigned short _menuItemsCount = 0;
+  String _bottomMessage = "";
+  settingsModel _settingsModel;
 
-  int buttonState;
-  int lastButtonState = 0;
-  unsigned long lastDebounceTime = 0;
-  unsigned long debounceDelay = 50;
+  int _buttonState;
+  int _lastButtonState = 0;
+  unsigned long _lastDebounceTime = 0;
+  unsigned long _debounceDelay = 50;
 
   const byte _outputA = 2;
   const byte _outputB = 3;
   const byte _switch = 4;
 
   void showMenuOnOledDisplay(byte menuId);
-  void setBottomMessage(String message);
   void drawTopAndBottomOfMenu(String menuName);
   void showMenu(bool buttonPressed);
-  void showMainMenu();
+  void showMainMenu(bool buttonPressed);
+  void showControllerIpMenu(bool buttonPressed);
   void setCurrentMenuIdByRotaryInput();
+  bool checkForButtonPress();
 };
 
 #endif

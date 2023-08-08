@@ -1,15 +1,16 @@
 #include <NativeEthernet.h>
 #include "Laser.h"
-#include <EEPROM.h>
 #include <ArduinoJson.h>  // include before MsgPacketizer.h
 #include <queue>
 #include "OledModule.h"
+#include "Settings.h"
 
 Laser _laser;
 OledModule _oledModule;
 
 EthernetClient _client;
 IPAddress _server;
+settingsModel _settingsModel;
 
 enum laserStatus {
   Defect = 0,                      // An hardware defect has been detected and the laser is locked due to safety reasons
@@ -81,11 +82,6 @@ void connectToController(String controllerIp) {
   }
 }
 
-struct settingsModel {
-  byte controllerIp[4];
-  byte maxPowerRgb[3];
-};
-
 /**
  @brief Checks if the array objects in the array are not empty
 
@@ -107,7 +103,16 @@ bool checkIfArrayIsNotEmpty(byte array[]) {
 void setup() {
   Serial.begin(9600);
   Serial.println("Start");
-  _oledModule.init();
+
+  _settingsModel.controllerIp[0] = 192;
+  _settingsModel.controllerIp[1] = 168;
+  _settingsModel.controllerIp[2] = 1;
+  _settingsModel.controllerIp[3] = 31;
+  setSettings(_settingsModel);
+
+  _oledModule.setBottomMessage("Placeholder");
+  _oledModule.init(_settingsModel);
+
   while (true) {
     _oledModule.checkForInput();
   }
@@ -116,11 +121,10 @@ void setup() {
   teensyMAC(mac);
   Ethernet.begin(mac);
 
-  settingsModel model;
-  EEPROM.get(0, model);
+  getSettings(_settingsModel);
 
-  bool controllerIpIsNotEmpty = checkIfArrayIsNotEmpty(model.controllerIp);
-  bool maxPowerIpIsNotEmpty = checkIfArrayIsNotEmpty(model.maxPowerRgb);
+  bool controllerIpIsNotEmpty = checkIfArrayIsNotEmpty(_settingsModel.controllerIp);
+  bool maxPowerIpIsNotEmpty = checkIfArrayIsNotEmpty(_settingsModel.maxPowerRgb);
   bool settingsValid = controllerIpIsNotEmpty && maxPowerIpIsNotEmpty;
   if (!settingsValid) {
     setLaserStatus(laserStatus::NotConfigured);
