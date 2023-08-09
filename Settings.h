@@ -6,8 +6,7 @@
 
 struct settingsModel {
   byte controllerIp[4];
-  byte maxPowerRgb[3];
-  byte brightness;
+  byte maxPowerRgb;
 };
 
 void setSettings(settingsModel settings);

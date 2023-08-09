@@ -12,6 +12,9 @@ EthernetClient _client;
 IPAddress _server;
 settingsModel _settingsModel;
 
+unsigned long _previousScreenUpdate = 0;
+unsigned short _screenRefreshRate = 40;  // Fps
+
 enum laserStatus {
   Defect = 0,                      // An hardware defect has been detected and the laser is locked due to safety reasons
   Ready = 1,                       // The laser is ready to receive and process commands that are received
@@ -100,32 +103,47 @@ bool checkIfArrayIsNotEmpty(byte array[]) {
   return emptyValueOccurances != lengthOfArray;
 }
 
+/**
+ @brief Checks the settings of the settings model and displays warnings on the bottom part of the menu
+*/
+void checkSettingsAndDisplayWarnings() {
+  bool controllerIpIsEmpty = !checkIfArrayIsNotEmpty(_settingsModel.controllerIp);
+  if (controllerIpIsEmpty) {
+    _oledModule.setBottomMessage("Controller IP not set");
+    return;
+  }
+
+  bool maxLaserPowerIsLow = _settingsModel.maxPowerRgb < 20;
+  if (maxLaserPowerIsLow) {
+    _oledModule.setBottomMessage("Max laser power low");
+    return;
+  }
+
+  _oledModule.setBottomMessage("");
+}
+
 void setup() {
   Serial.begin(9600);
   Serial.println("Start");
+  getSettings(_settingsModel);
 
-  _settingsModel.controllerIp[0] = 192;
-  _settingsModel.controllerIp[1] = 168;
-  _settingsModel.controllerIp[2] = 1;
-  _settingsModel.controllerIp[3] = 31;
-  setSettings(_settingsModel);
-
-  _oledModule.setBottomMessage("Placeholder");
+  checkSettingsAndDisplayWarnings();
   _oledModule.init(_settingsModel);
 
   while (true) {
-    _oledModule.checkForInput();
+    const unsigned short timePerFrameInMs = 1000 / _screenRefreshRate;
+    if (millis() - _previousScreenUpdate > timePerFrameInMs) {
+      _oledModule.checkForInput();
+      checkSettingsAndDisplayWarnings();
+      _previousScreenUpdate = millis();
+    }
   }
 
   byte mac[6];
   teensyMAC(mac);
   Ethernet.begin(mac);
 
-  getSettings(_settingsModel);
-
-  bool controllerIpIsNotEmpty = checkIfArrayIsNotEmpty(_settingsModel.controllerIp);
-  bool maxPowerIpIsNotEmpty = checkIfArrayIsNotEmpty(_settingsModel.maxPowerRgb);
-  bool settingsValid = controllerIpIsNotEmpty && maxPowerIpIsNotEmpty;
+  bool settingsValid = checkIfArrayIsNotEmpty(_settingsModel.controllerIp);
   if (!settingsValid) {
     setLaserStatus(laserStatus::NotConfigured);
   }

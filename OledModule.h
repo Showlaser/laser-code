@@ -6,7 +6,7 @@
 
 class OledModule {
 public:
-  void init(settingsModel &settings);
+  void init(settingsModel settings);
   void checkForInput();
   void setBottomMessage(String message);
 
@@ -32,6 +32,9 @@ private:
   void showMenu(bool buttonPressed);
   void showMainMenu(bool buttonPressed);
   void showControllerIpMenu(bool buttonPressed);
+  void showMaxLaserPowerMenu(bool buttonPressed);
+  void showStatusMenu(bool buttonPressed);
+  void exitSubMenu();
   void setCurrentMenuIdByRotaryInput();
   bool checkForButtonPress();
 };
