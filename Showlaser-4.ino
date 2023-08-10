@@ -2,15 +2,14 @@
 #include "Laser.h"
 #include <ArduinoJson.h>  // include before MsgPacketizer.h
 #include <queue>
-#include "OledModule.h"
 #include "Settings.h"
+#include "OledModule.h"
 
 Laser _laser;
 OledModule _oledModule;
 
 EthernetClient _client;
 IPAddress _server;
-settingsModel _settingsModel;
 
 unsigned long _previousScreenUpdate = 0;
 unsigned short _screenRefreshRate = 40;  // Fps
@@ -107,13 +106,13 @@ bool checkIfArrayIsNotEmpty(byte array[]) {
  @brief Checks the settings of the settings model and displays warnings on the bottom part of the menu
 */
 void checkSettingsAndDisplayWarnings() {
-  bool controllerIpIsEmpty = !checkIfArrayIsNotEmpty(_settingsModel.controllerIp);
+  bool controllerIpIsEmpty = !checkIfArrayIsNotEmpty(laserSettings.controllerIp);
   if (controllerIpIsEmpty) {
     _oledModule.setBottomMessage("Controller IP not set");
     return;
   }
 
-  bool maxLaserPowerIsLow = _settingsModel.maxPowerRgb < 20;
+  bool maxLaserPowerIsLow = laserSettings.maxPowerRgb < 20;
   if (maxLaserPowerIsLow) {
     _oledModule.setBottomMessage("Max laser power low");
     return;
@@ -125,10 +124,10 @@ void checkSettingsAndDisplayWarnings() {
 void setup() {
   Serial.begin(9600);
   Serial.println("Start");
-  getSettings(_settingsModel);
+  initSettings();
 
   checkSettingsAndDisplayWarnings();
-  _oledModule.init(_settingsModel);
+  _oledModule.init();
 
   while (true) {
     const unsigned short timePerFrameInMs = 1000 / _screenRefreshRate;
@@ -143,7 +142,7 @@ void setup() {
   teensyMAC(mac);
   Ethernet.begin(mac);
 
-  bool settingsValid = checkIfArrayIsNotEmpty(_settingsModel.controllerIp);
+  bool settingsValid = checkIfArrayIsNotEmpty(laserSettings.controllerIp);
   if (!settingsValid) {
     setLaserStatus(laserStatus::NotConfigured);
   }

@@ -9,7 +9,9 @@ struct settingsModel {
   byte maxPowerRgb;
 };
 
-void setSettings(settingsModel settings);
-void getSettings(settingsModel &settings);
+extern settingsModel laserSettings;
+
+void initSettings();
+void setSettings();
 
 #endif

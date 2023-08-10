@@ -14,14 +14,13 @@ Encoder myEnc(5, 6);
 /**
  @brief Initializes the OLED screen and displays "hardware testing" on the screen 
 */
-void OledModule::init(settingsModel settings) {
+void OledModule::init() {
   if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {  // Address 0x3D for 128x64
     Serial.println(F("SSD1306 allocation failed"));
     for (;;)
       ;
   }
 
-  _settingsModel = settings;
   showMenu(false);
 }
 
@@ -128,7 +127,7 @@ void OledModule::showMainMenu(bool buttonPressed) {
 void OledModule::showControllerIpMenu(bool buttonPressed) {
   bool userWantsToEditValue = buttonPressed && _currentSelectedMenuItemValue == -999;
   if (userWantsToEditValue) {
-    _currentSelectedMenuItemValue = _settingsModel.controllerIp[_currentSelectedMenuItemId];
+    _currentSelectedMenuItemValue = laserSettings.controllerIp[_currentSelectedMenuItemId];
     myEnc.write(_currentSelectedMenuItemValue * 4);
   }
 
@@ -142,13 +141,13 @@ void OledModule::showControllerIpMenu(bool buttonPressed) {
       myEnc.write(1020);
     }
 
-    _settingsModel.controllerIp[_currentSelectedMenuItemId] = _currentSelectedMenuItemValue;
+    laserSettings.controllerIp[_currentSelectedMenuItemId] = _currentSelectedMenuItemValue;
   }
 
   bool userWantsToSaveValue = buttonPressed && !userWantsToEditValue && !userIsEditingValue;
   if (userWantsToSaveValue) {
     _currentSelectedMenuItemValue = -999;
-    setSettings(_settingsModel);
+    setSettings();
     myEnc.write(_currentSelectedMenuItemId * 4);
   }
 
@@ -162,7 +161,7 @@ void OledModule::showControllerIpMenu(bool buttonPressed) {
   drawTopAndBottomOfMenu("Controller IP");
   for (unsigned short i = 0; i < 4; i++) {
     display.setCursor(i * 30 + 8, 28);
-    display.println(_settingsModel.controllerIp[i]);
+    display.println(laserSettings.controllerIp[i]);
   }
 
   display.setCursor(52, 46);
@@ -181,10 +180,10 @@ void OledModule::showControllerIpMenu(bool buttonPressed) {
 void OledModule::showMaxLaserPowerMenu(bool buttonPressed) {
   bool userWantsToEditValue = buttonPressed && _currentSelectedMenuItemValue == -999;
   if (userWantsToEditValue) {
-    _currentSelectedMenuItemValue = _settingsModel.maxPowerRgb;
+    _currentSelectedMenuItemValue = laserSettings.maxPowerRgb;
     myEnc.write(_currentSelectedMenuItemValue * 4);
-    display.drawLine(0, 18, abs(_settingsModel.maxPowerRgb / 2), 18, SSD1306_WHITE);
-    display.drawLine(0, 19, abs(_settingsModel.maxPowerRgb / 2), 19, SSD1306_WHITE);
+    display.drawLine(0, 18, abs(laserSettings.maxPowerRgb / 2), 18, SSD1306_WHITE);
+    display.drawLine(0, 19, abs(laserSettings.maxPowerRgb / 2), 19, SSD1306_WHITE);
   }
 
   bool userIsEditingValue = !buttonPressed && _currentSelectedMenuItemValue != -999;
@@ -197,15 +196,15 @@ void OledModule::showMaxLaserPowerMenu(bool buttonPressed) {
       myEnc.write(1020);
     }
 
-    _settingsModel.maxPowerRgb = _currentSelectedMenuItemValue;
-    display.drawLine(0, 18, abs(_settingsModel.maxPowerRgb / 2), 18, SSD1306_WHITE);
-    display.drawLine(0, 19, abs(_settingsModel.maxPowerRgb / 2), 19, SSD1306_WHITE);
+    laserSettings.maxPowerRgb = _currentSelectedMenuItemValue;
+    display.drawLine(0, 18, abs(laserSettings.maxPowerRgb / 2), 18, SSD1306_WHITE);
+    display.drawLine(0, 19, abs(laserSettings.maxPowerRgb / 2), 19, SSD1306_WHITE);
   }
 
   bool userWantsToSaveValue = buttonPressed && !userWantsToEditValue && !userIsEditingValue;
   if (userWantsToSaveValue) {
     _currentSelectedMenuItemValue = -999;
-    setSettings(_settingsModel);
+    setSettings();
     myEnc.write(_currentSelectedMenuItemId * 4);
   }
 
@@ -218,7 +217,7 @@ void OledModule::showMaxLaserPowerMenu(bool buttonPressed) {
   _menuItemsCount = 2;
   drawTopAndBottomOfMenu("Max laser power");
   display.setCursor(52, 28);
-  display.println(_settingsModel.maxPowerRgb);
+  display.println(laserSettings.maxPowerRgb);
 
   display.setCursor(52, 46);
   display.println("Exit");

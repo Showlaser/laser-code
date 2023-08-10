@@ -6,7 +6,7 @@
 
 class OledModule {
 public:
-  void init(settingsModel settings);
+  void init();
   void checkForInput();
   void setBottomMessage(String message);
 
@@ -16,7 +16,6 @@ private:
   int _currentSelectedMenuItemValue = -999;
   unsigned short _menuItemsCount = 0;
   String _bottomMessage = "";
-  settingsModel _settingsModel;
 
   int _buttonState;
   int _lastButtonState = 0;

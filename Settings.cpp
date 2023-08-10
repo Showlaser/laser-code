@@ -1,15 +1,17 @@
 #include "Settings.h"
 
+settingsModel laserSettings;
+
 /**
  @brief Saves the settings to the EEPROM 
 */
-void setSettings(settingsModel settings) {
-  EEPROM.put(0, settings);
+void setSettings() {
+  EEPROM.put(0, laserSettings);
 }
 
 /**
-  @brief Gets the saved settings from the EEPROM by reference
+  @brief Loads the saved settings from the EEPROM by reference in the laserSettings variable
 */
-void getSettings(settingsModel &settings) {
-  EEPROM.get(0, settings);
+void initSettings() {
+  EEPROM.get(0, laserSettings);
 }
