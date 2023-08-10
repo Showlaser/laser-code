@@ -12,7 +12,9 @@ EthernetClient _client;
 IPAddress _server;
 
 unsigned long _previousScreenUpdate = 0;
-unsigned short _screenRefreshRate = 40;  // Fps
+unsigned short _screenRefreshRate = 60;  // Fps
+
+unsigned long _previousSettingsCheck = 0;
 
 enum laserStatus {
   Defect = 0,                      // An hardware defect has been detected and the laser is locked due to safety reasons
@@ -126,15 +128,19 @@ void setup() {
   Serial.println("Start");
   initSettings();
 
-  checkSettingsAndDisplayWarnings();
   _oledModule.init();
+  checkSettingsAndDisplayWarnings();
 
   while (true) {
     const unsigned short timePerFrameInMs = 1000 / _screenRefreshRate;
     if (millis() - _previousScreenUpdate > timePerFrameInMs) {
       _oledModule.checkForInput();
-      checkSettingsAndDisplayWarnings();
       _previousScreenUpdate = millis();
+    }
+
+    if (millis() - _previousSettingsCheck > 5000) {
+      checkSettingsAndDisplayWarnings();
+      _previousSettingsCheck = millis();
     }
   }
 

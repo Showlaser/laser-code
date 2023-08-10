@@ -54,6 +54,7 @@ void OledModule::showMenu(bool buttonPressed) {
 */
 void OledModule::setBottomMessage(String message) {
   _bottomMessage = message;
+  showMenu(false);
 }
 
 /**
