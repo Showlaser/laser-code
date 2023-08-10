@@ -30,7 +30,6 @@ void OledModule::init(settingsModel settings) {
 */
 void OledModule::showMenu(bool buttonPressed) {
   display.clearDisplay();
-  Serial.println(_currentSelectedMenuId);
   switch (_currentSelectedMenuId) {
     case 0:
       showMainMenu(buttonPressed);
@@ -42,11 +41,9 @@ void OledModule::showMenu(bool buttonPressed) {
       showMaxLaserPowerMenu(buttonPressed);
       break;
     case 3:
-    Serial.println("Show status");
       showStatusMenu(buttonPressed);
       break;
     default:
-      Serial.println("Default");
       break;
   }
 
@@ -79,10 +76,12 @@ void OledModule::drawTopAndBottomOfMenu(String menuName) {
 }
 
 void OledModule::exitSubMenu() {
-  _menuItemsCount = 0;
+  display.clearDisplay();
+  myEnc.write(0);
   _currentSelectedMenuId = 0;
   _currentSelectedMenuItemId = 0;
   _currentSelectedMenuItemValue = -999;
+  showMainMenu(false);
 }
 
 /**
@@ -102,8 +101,10 @@ void OledModule::showMainMenu(bool buttonPressed) {
     for (unsigned short i = 0; i < _menuItemsCount; i++) {
       mainMenuItem item = items[i];
       if (cursorYLocation == item.yPosition) {
+        myEnc.write(0);
         _currentSelectedMenuId = i + 1;
         _currentSelectedMenuItemId = 0;
+        _currentSelectedMenuItemValue = -999;
         showMenu(false);
         return;
       }
@@ -128,19 +129,27 @@ void OledModule::showControllerIpMenu(bool buttonPressed) {
   bool userWantsToEditValue = buttonPressed && _currentSelectedMenuItemValue == -999;
   if (userWantsToEditValue) {
     _currentSelectedMenuItemValue = _settingsModel.controllerIp[_currentSelectedMenuItemId];
+    myEnc.write(_currentSelectedMenuItemValue * 4);
   }
 
   bool userIsEditingValue = !buttonPressed && _currentSelectedMenuItemValue != -999;
   if (userIsEditingValue) {
-    if (_currentSelectedMenuItemValue >= 0 && _currentSelectedMenuItemValue <= 255) {
-      _settingsModel.controllerIp[_currentSelectedMenuItemId] = _currentSelectedMenuItemValue;
+    if (_currentSelectedMenuItemValue < 0) {
+      _currentSelectedMenuItemValue = 0;
+      myEnc.write(0);
+    } else if (_currentSelectedMenuItemValue > 255) {
+      _currentSelectedMenuItemValue = 255;
+      myEnc.write(1020);
     }
+
+    _settingsModel.controllerIp[_currentSelectedMenuItemId] = _currentSelectedMenuItemValue;
   }
 
   bool userWantsToSaveValue = buttonPressed && !userWantsToEditValue && !userIsEditingValue;
   if (userWantsToSaveValue) {
     _currentSelectedMenuItemValue = -999;
     setSettings(_settingsModel);
+    myEnc.write(_currentSelectedMenuItemId * 4);
   }
 
   bool userPressedExit = buttonPressed && _currentSelectedMenuItemId == 4;
@@ -173,21 +182,31 @@ void OledModule::showMaxLaserPowerMenu(bool buttonPressed) {
   bool userWantsToEditValue = buttonPressed && _currentSelectedMenuItemValue == -999;
   if (userWantsToEditValue) {
     _currentSelectedMenuItemValue = _settingsModel.maxPowerRgb;
+    myEnc.write(_currentSelectedMenuItemValue * 4);
+    display.drawLine(0, 18, abs(_settingsModel.maxPowerRgb / 2), 18, SSD1306_WHITE);
+    display.drawLine(0, 19, abs(_settingsModel.maxPowerRgb / 2), 19, SSD1306_WHITE);
   }
 
   bool userIsEditingValue = !buttonPressed && _currentSelectedMenuItemValue != -999;
   if (userIsEditingValue) {
-    if (_currentSelectedMenuItemValue >= 0 && _currentSelectedMenuItemValue <= 255) {
-      _settingsModel.maxPowerRgb = _currentSelectedMenuItemValue;
-      display.drawLine(0, 18, abs(_settingsModel.maxPowerRgb / 2), 18, SSD1306_WHITE);
-      display.drawLine(0, 19, abs(_settingsModel.maxPowerRgb / 2), 19, SSD1306_WHITE);
+    if (_currentSelectedMenuItemValue < 0) {
+      _currentSelectedMenuItemValue = 0;
+      myEnc.write(0);
+    } else if (_currentSelectedMenuItemValue > 255) {
+      _currentSelectedMenuItemValue = 255;
+      myEnc.write(1020);
     }
+
+    _settingsModel.maxPowerRgb = _currentSelectedMenuItemValue;
+    display.drawLine(0, 18, abs(_settingsModel.maxPowerRgb / 2), 18, SSD1306_WHITE);
+    display.drawLine(0, 19, abs(_settingsModel.maxPowerRgb / 2), 19, SSD1306_WHITE);
   }
 
   bool userWantsToSaveValue = buttonPressed && !userWantsToEditValue && !userIsEditingValue;
   if (userWantsToSaveValue) {
     _currentSelectedMenuItemValue = -999;
     setSettings(_settingsModel);
+    myEnc.write(_currentSelectedMenuItemId * 4);
   }
 
   bool userPressedExit = buttonPressed && _currentSelectedMenuItemId == 1;
@@ -287,11 +306,16 @@ void OledModule::checkForInput() {
     if (currentReading != _currentSelectedMenuItemId) {
       _currentSelectedMenuItemId = currentReading;
       showMenu(buttonPressed);
-    }
-    if (buttonPressed) {
+    } else if (buttonPressed) {
       showMenu(buttonPressed);
     }
-  } else {
+
+    return;
+  }
+
+  if (currentReading < 0) {
     myEnc.write(0);
+  } else if (currentReading > _menuItemsCount - 1) {
+    myEnc.write(currentReading * 4 - 4);
   }
 }
