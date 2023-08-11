@@ -1,6 +1,6 @@
 #include <NativeEthernet.h>
 #include "Laser.h"
-#include <ArduinoJson.h>  // include before MsgPacketizer.h
+#include <ArduinoJson.h>
 #include <queue>
 #include "Settings.h"
 #include "OledModule.h"
@@ -125,8 +125,8 @@ void checkSettingsAndDisplayWarnings() {
 
 void setup() {
   Serial.begin(9600);
-  Serial.println("Start");
   initSettings();
+  _laser.init(4000, 0, 0);
 
   _oledModule.init();
   checkSettingsAndDisplayWarnings();
@@ -159,7 +159,7 @@ void setup() {
 void loop() {
   if (_client.connected()) {
   } else {
-    // laser.turnLasersOff();
+    _laser.setLaserPower(0, 0, 0);
     _client.stop();
     setLaserStatus(laserStatus::ConnectionToControllerLost);
   }

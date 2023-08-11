@@ -1,11 +1,19 @@
 #include "Laser.h"
 #include "math.h"
-#include "Dac.h"
-#include "Basics.h"
+#include "DAC_MCP4X.h"
+
+#define MCP4X_PORT_WRITE 1
 
 MCP4X dac;
 
-Laser::Laser() {
+/**
+ @brief Initializes the laser class
+
+ @param scale the scale at which the laser image is projected
+ @param offsetX the offset on the x axis
+ @param offsetY the offset on the y axis
+*/
+void Laser::init(float scale, long offsetX, long offsetY) {
   _quality = FROM_FLOAT(1. / (LASER_QUALITY));
 
   _x = 0;
@@ -14,7 +22,6 @@ Laser::Laser() {
   _oldY = 0;
 
   _state = 0;
-
   _scale = 1;
   _offsetX = 0;
   _offsetY = 0;
@@ -26,16 +33,7 @@ Laser::Laser() {
 
   _enable3D = false;
   _zDist = 1000;
-}
 
-/**
- @brief Initializes the laser class
-
- @param scale the scale at which the laser image is projected
- @param offsetX the offset on the x axis
- @param offsetY the offset on the y axis
-*/
-void Laser::init(float scale, long offsetX, long offsetY) {
   _scale = FROM_FLOAT(scale);
   _offsetX = offsetX;
   _offsetY = offsetY;
@@ -150,14 +148,11 @@ void Laser::sendtoRaw(int xNew, int yNew) {
 
    @return int the value between or equal to the min or max value
 */
-int Laser::fixBoundary(int input, int min, int max)
-{
-  if (input < min)
-  {
+int Laser::fixBoundary(int input, int min, int max) {
+  if (input < min) {
     return min;
   }
-  if (input > max)
-  {
+  if (input > max) {
     return max;
   }
   return input;

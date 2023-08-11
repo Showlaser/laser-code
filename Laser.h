@@ -31,7 +31,6 @@
 
 class Laser {
 public:
-  Laser();
   void init(float scale, long offsetX, long offsetY);
   void sendTo(int x, int y);
   bool hardwareSelfCheck();

@@ -1,11 +1,11 @@
 /*
-   Microchip MCP4822 12-bit DAC driver
+   Microchip MCP4901 / MCP4911 / MCP4921 / MCP4902 / MCP4912 / MCP4922 8/10/12-bit DAC driver
 
    See header file.
 */
 
 #include <SPI.h>
-#include "Dac.h"
+#include "DAC_MCP4X.h"
 
 
 byte MCP4X::init(byte model, unsigned int vrefA, unsigned int vrefB,

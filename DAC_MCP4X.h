@@ -1,5 +1,5 @@
-#ifndef Dac_H
-#define Dac_H
+#ifndef _DAC_MCP4X_H
+#define _DAC_MCP4X_H
 
 #include <Arduino.h>
 #include <inttypes.h>
