@@ -1,142 +1,88 @@
 #include "Laser.h"
-#include "math.h"
-#include "DAC_MCP4X.h"
+#include <MCP48xx.h>
 
-#define MCP4X_PORT_WRITE 1
+// Define the MCP4822 instances and their respective CS pins
+MCP4822 dac1(9);  // CS pin for DAC1
+MCP4822 dac2(10); // CS pin for DAC2
+MCP4822 dac3(12); // CS pin for DAC3
 
-MCP4X dac;
+void Laser::configureDacs()
+{
+  dac1.init();
+  dac2.init();
+  dac3.init();
 
-/**
- @brief Initializes the laser class
+  // Turn on both channels A and B for DACs
+  dac1.turnOnChannelA();
+  dac1.turnOnChannelB();
+  dac2.turnOnChannelA();
+  dac2.turnOnChannelB();
+  dac3.turnOnChannelA();
+  dac3.turnOnChannelB();
 
- @param scale the scale at which the laser image is projected
- @param offsetX the offset on the x axis
- @param offsetY the offset on the y axis
-*/
-void Laser::init(float scale, long offsetX, long offsetY) {
-  _quality = FROM_FLOAT(1. / (LASER_QUALITY));
+  // Configure DACs' channels in High gain mode (optional, as it's the default)
+  dac1.setGainA(MCP4822::Low);
+  dac1.setGainB(MCP4822::Low);
+  dac2.setGainA(MCP4822::Low);
+  dac2.setGainB(MCP4822::Low);
+  dac3.setGainA(MCP4822::Low);
+  dac3.setGainB(MCP4822::Low);
+}
 
-  _x = 0;
-  _y = 0;
-  _oldX = 0;
-  _oldY = 0;
+void Laser::init()
+{
+  configureDacs();
+}
 
-  _state = 0;
-  _scale = 1;
-  _offsetX = 0;
-  _offsetY = 0;
-
-  _moved = 0;
-  _maxMove = -1;
-  _laserForceOff = false;
-  resetClipArea();
-
-  _enable3D = false;
-  _zDist = 1000;
-
-  _scale = FROM_FLOAT(scale);
-  _offsetX = offsetX;
-  _offsetY = offsetY;
-
-  dac.init(MCP4X_4822, 5000, 5000, 10, 7, 1);
-  dac.setGain2x(MCP4X_CHAN_A, 0);
-  dac.setGain2x(MCP4X_CHAN_B, 0);
-  dac.begin(1);
+int Laser::mapPositionToResolution(int value)
+{
+  return map(value, -4000, 4000, 0, 4096);
 }
 
 /**
- @brief Sends the coordinates to the DAC
+   @brief set input parameters within valid limits, creates a linear voltage from the previous to the new point (zigzag) and sends it to the laser.
+   The zigzag is created to prevent the galvos from moving very abruptly to the next position which will cause the power supply to go into protection mode 
 
- @param x the location the galvo should move on the x axis to move to
- @param y the location the galvo should move on the y axis to move to
+   @param xPos the position for the x axis galvo to move to
+   @param yPos the position for the y axis galvo to move to
 */
-void Laser::sendToDAC(int x, int y) {
-#ifdef LASER_SWAP_XY
-  int x1 = y;
-  int y1 = x;
-#else
-  int x1 = x;
-  int y1 = y;
-#endif
-#ifdef LASER_FLIP_X
-  x1 = 4095 - x1;
-#endif
-#ifdef LASER_FLIP_Y
-  y1 = 4095 - y1;
-#endif
-  dac.output2(x1, y1);
-}
-
-void Laser::resetClipArea() {
-  _clipXMin = 0;
-  _clipYMin = 0;
-  _clipXMax = 4095;
-  _clipYMax = 4095;
-}
-
-void Laser::setClipArea(int x, int y, int x1, int y1) {
-  _clipXMin = x;
-  _clipYMin = y;
-  _clipXMax = x1;
-  _clipYMax = y1;
-}
-
-/**
-   @brief sends the mirrors of the galvo to the specified location
-
-   @param xpos the position of the x mirror in the galvo
-   @param ypos the position of the y mirror in the galvo
-*/
-void Laser::sendTo(int xPos, int yPos) {
+void Laser::sendTo(int xPos, int yPos)
+{
   xPos = fixBoundary(xPos, -4000, 4000);
   yPos = fixBoundary(yPos, -4000, 4000);
 
-  int delayMicrosecondsTimeX = (_xPos > xPos ? _xPos - xPos : xPos - _xPos) / 3;
-  int delayMicrosecondsTimeY = (_yPos > yPos ? _yPos - yPos : yPos - _yPos) / 3;
-  int delayTime = delayMicrosecondsTimeX > delayMicrosecondsTimeY ? delayMicrosecondsTimeX : delayMicrosecondsTimeY;
-  if (delayTime < 25) {
-    delayTime = 25;
+  int differenceX = xPos - _xPos;
+  int differenceY = yPos - _yPos;
+  int divideBy = asb(differenceX) > asb(differenceY) ? abs(differenceX / 8) : abs(differenceY / 8); # Equal time for each galvo to reach the given point
+  
+  int differenceXDivided = 0;
+  if (xPos != _xPos) {
+    differenceXDivided = differenceX / divideBy;
   }
-  if (delayTime > 1000) {
-    delayTime = 1000;
+  
+  int differenceYDivided = 0;
+  if (yPos != _yPos) {
+    differenceYDivided = differenceY / divideBy;
+  }
+
+  int x = 0;
+  int y = 0;
+
+  for (int i = 0; i < divideBy; i++) {
+    x += (int)differenceXDivided;
+    y += (int)differenceYDivided;
+
+    dac3.setVoltageA(mapPositionToResolution(x));
+    dac3.setVoltageB(mapPositionToResolution(y));
+    dac3.updateDAC();
   }
 
   _xPos = xPos;
   _yPos = yPos;
 
-  long xNew = TO_INT(_xPos * _scale) + _offsetX;
-  long yNew = TO_INT(_yPos * _scale) + _offsetY;
-
-  sendtoRaw(xNew, yNew);
-  delayMicroseconds(delayTime);
-}
-
-void Laser::sendtoRaw(int xNew, int yNew) {
-  // devide into equal parts, using _quality
-  long fdiffx = xNew - _x;
-  long fdiffy = yNew - _y;
-  long diffx = TO_INT(abs(fdiffx) * _quality);
-  long diffy = TO_INT(abs(fdiffy) * _quality);
-
-  // use the bigger direction
-  if (diffx < diffy) {
-    diffx = diffy;
-  }
-
-  fdiffx = FROM_INT(fdiffx) / diffx;
-  fdiffy = FROM_INT(fdiffy) / diffx;
-  // interpolate in FIXPT
-  FIXPT tmpx = 0;
-  FIXPT tmpy = 0;
-  for (int i = 0; i < diffx - 1; i++) {
-    tmpx += fdiffx;
-    tmpy += fdiffy;
-    sendToDAC(_x + TO_INT(tmpx), _y + TO_INT(tmpy));
-  }
-
-  _x = xNew;
-  _y = yNew;
-  sendToDAC(_x, _y);
+  dac3.setVoltageA(mapPositionToResolution(xPos));
+  dac3.setVoltageB(mapPositionToResolution(yPos));
+  dac3.updateDAC();
 }
 
 /**
@@ -148,11 +94,14 @@ void Laser::sendtoRaw(int xNew, int yNew) {
 
    @return int the value between or equal to the min or max value
 */
-int Laser::fixBoundary(int input, int min, int max) {
-  if (input < min) {
+int Laser::fixBoundary(int input, int min, int max)
+{
+  if (input < min)
+  {
     return min;
   }
-  if (input > max) {
+  if (input > max)
+  {
     return max;
   }
   return input;
@@ -166,7 +115,8 @@ int Laser::fixBoundary(int input, int min, int max) {
  @param green the power the green laser should output from 0 / 255
  @param blue the power the blue laser should output from 0 / 255
 */
-void Laser::setLaserPower(byte red, byte green, byte blue) {
+void Laser::setLaserPower(byte red, byte green, byte blue)
+{
   const byte r = fixBoundary(red, 0, 255);
   const byte g = fixBoundary(green, 0, 255);
   const byte b = fixBoundary(blue, 0, 255);
@@ -181,17 +131,18 @@ void Laser::setLaserPower(byte red, byte green, byte blue) {
 
  @return boolean true if the test succeeded false if the test fails
 */
-bool Laser::testGalvoFeedback() {
+bool Laser::testGalvoFeedback()
+{
   sendtoRaw(0, 0);
-  delay(100);  // Delay to give the galvo's time to reach the position
+  delay(100); // Delay to give the galvo's time to reach the position
 
   sendtoRaw(4000, 4000);
-  delay(100);  // Delay to give the galvo's time to reach the position
+  delay(100); // Delay to give the galvo's time to reach the position
   const short xPosFeedback = analogRead(_xGalvoFeedbackSignal);
   const short yPosFeedback = analogRead(_yGalvoFeedbackSignal);
 
   sendtoRaw(-4000, -4000);
-  delay(100);  // Delay to give the galvo's time to reach the position
+  delay(100); // Delay to give the galvo's time to reach the position
   const bool xGalvoFeedbackWorking = abs(xPosFeedback - analogRead(_xGalvoFeedbackSignal)) > 800;
   const bool yGalvoFeedbackWorking = abs(yPosFeedback - analogRead(_yGalvoFeedbackSignal)) > 800;
 
@@ -200,9 +151,10 @@ bool Laser::testGalvoFeedback() {
 
 /**
  @brief This function turns the lasers on, the laser will not output power because the watchdog is currently in the HardwareCheck state.
- @brief The watchdog verifies that the laser feedback is working and will change the state to ready if the lasers are turned off and the rest of the hardware check succeeded. 
+ @brief The watchdog verifies that the laser feedback is working and will change the state to ready if the lasers are turned off and the rest of the hardware check succeeded.
 */
-void Laser::testLaserFeedbackForWatchdog() {
+void Laser::testLaserFeedbackForWatchdog()
+{
   setLaserPower(10, 10, 10);
   delay(10);
   setLaserPower(0, 0, 0);
@@ -210,10 +162,11 @@ void Laser::testLaserFeedbackForWatchdog() {
 
 /**
  * @brief Performs a hardware check for the galvo's and the laser readout
- * 
+ *
  * @return true if the function succeeds, false if it fails
  */
-bool Laser::hardwareSelfCheck() {
+bool Laser::hardwareSelfCheck()
+{
   const bool galvosWorking = testGalvoFeedback();
   testLaserFeedbackForWatchdog();
   const bool watchdogReady = analogRead(_safeOperationPin) > 800;

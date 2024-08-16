@@ -3,11 +3,11 @@
 
 class AudienceShutter {
   public:
-    moveShutterUp();
-    moveShutterDown();
+    void moveShutterUp();
+    void moveShutterDown();
 
   private:
 
-}
+};
 
 #endif
