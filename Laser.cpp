@@ -2,12 +2,11 @@
 #include <MCP48xx.h>
 
 // Define the MCP4822 instances and their respective CS pins
-MCP4822 dac1(9);  // CS pin for DAC1
-MCP4822 dac2(10); // CS pin for DAC2
-MCP4822 dac3(12); // CS pin for DAC3
+MCP4822 dac1(9);   // CS pin for DAC1
+MCP4822 dac2(10);  // CS pin for DAC2
+MCP4822 dac3(12);  // CS pin for DAC3
 
-void Laser::configureDacs()
-{
+void Laser::configureDacs() {
   dac1.init();
   dac2.init();
   dac3.init();
@@ -27,62 +26,84 @@ void Laser::configureDacs()
   dac2.setGainB(MCP4822::Low);
   dac3.setGainA(MCP4822::Low);
   dac3.setGainB(MCP4822::Low);
+
+  dac1.setVoltageA(0);
+  dac1.setVoltageB(0);
+  dac1.updateDAC();
+
+  dac2.setVoltageA(0);
+  dac2.setVoltageB(0);
+  dac2.updateDAC();
+
+  dac3.setVoltageA(0);
+  dac3.setVoltageB(0);
+  dac3.updateDAC();
 }
 
-void Laser::init()
-{
+void Laser::init(WDT_T4<WDT1> &watchdog, settingsModel laserSettings) {
+  _watchdog = watchdog;
+  _laserSettings = laserSettings;
   configureDacs();
-}
-
-int Laser::mapPositionToResolution(int value)
-{
-  return map(value, -4000, 4000, 0, 4096);
 }
 
 /**
    @brief set input parameters within valid limits, creates a linear voltage from the previous to the new point (zigzag) and sends it to the laser.
-   The zigzag is created to prevent the galvos from moving very abruptly to the next position which will cause the power supply to go into protection mode 
+   The zigzag is created to prevent the galvos from moving very abruptly to the next position which will cause the power supply to go into protection mode
 
    @param xPos the position for the x axis galvo to move to
    @param yPos the position for the y axis galvo to move to
 */
-void Laser::sendTo(int xPos, int yPos)
-{
-  xPos = fixBoundary(xPos, -4000, 4000);
-  yPos = fixBoundary(yPos, -4000, 4000);
 
-  int differenceX = xPos - _xPos;
-  int differenceY = yPos - _yPos;
-  int divideBy = asb(differenceX) > asb(differenceY) ? abs(differenceX / 8) : abs(differenceY / 8); # Equal time for each galvo to reach the given point
-  
-  int differenceXDivided = 0;
-  if (xPos != _xPos) {
-    differenceXDivided = differenceX / divideBy;
-  }
-  
-  int differenceYDivided = 0;
-  if (yPos != _yPos) {
-    differenceYDivided = differenceY / divideBy;
-  }
+/**
+  @brief sends the galvos to the specified position using logistic growth 
+*/
+void Laser::sendTo(int newXPos, int newYPos) {
+  _watchdog.feed();
 
-  int x = 0;
-  int y = 0;
+  int xPos = fixBoundary(newXPos, -4000, 4000);
+  int yPos = fixBoundary(newYPos, -4000, 4000);
 
-  for (int i = 0; i < divideBy; i++) {
-    x += (int)differenceXDivided;
-    y += (int)differenceYDivided;
+  int durationXGalvo = abs(xPos - _xPos) / 2;  // Duration of the entire cycle in microseconds
+  int durationYGalvo = abs(yPos - _yPos) / 2;  // Duration of the entire cycle in microseconds
+  int duration = (durationXGalvo >= durationYGalvo ? durationXGalvo : durationYGalvo);
 
-    dac3.setVoltageA(mapPositionToResolution(x));
-    dac3.setVoltageB(mapPositionToResolution(y));
+  float middlePoint = duration / 2.0;
+  float growRate = 0.008;
+
+  unsigned long startTime = micros();
+  unsigned long endTime = startTime + duration;
+
+  // positive or negative logistic growth curves this helps to smooth the galvo movement
+  while (micros() < endTime) {
+    float elapsedTime = micros() - startTime;
+
+    if (_xPos < xPos) {
+      int xMappedToVoltage = xPos = map(xPos, -4000, 4000, 0, 4096);
+      float xVoltage = xMappedToVoltage / (1.0 + exp(-growRate * (elapsedTime - middlePoint)));
+      dac3.setVoltageA(xVoltage);
+    } else {
+      int xMappedToVoltage = xPos = map(xPos, -4000, 4000, 0, 4096);
+      float xVoltage = xMappedToVoltage / (1.0 + exp(-growRate * ((duration - elapsedTime) - middlePoint)));
+      dac3.setVoltageA(xVoltage);
+    }
+
+    if (_yPos < yPos) {
+      int yMappedToVoltage = yPos = map(xPos, -4000, 4000, 0, 4096);
+      float yVoltage = yMappedToVoltage / (1.0 + exp(-growRate * (elapsedTime - middlePoint)));
+      dac3.setVoltageB(yVoltage);
+    } else {
+      int yMappedToVoltage = yPos = map(xPos, -4000, 4000, 0, 4096);
+      float yVoltage = yMappedToVoltage / (1.0 + exp(-growRate * ((duration - elapsedTime) - middlePoint)));
+      dac3.setVoltageB(yVoltage);
+    }
+
     dac3.updateDAC();
   }
 
   _xPos = xPos;
   _yPos = yPos;
 
-  dac3.setVoltageA(mapPositionToResolution(xPos));
-  dac3.setVoltageB(mapPositionToResolution(yPos));
-  dac3.updateDAC();
+  _watchdog.feed();
 }
 
 /**
@@ -94,14 +115,11 @@ void Laser::sendTo(int xPos, int yPos)
 
    @return int the value between or equal to the min or max value
 */
-int Laser::fixBoundary(int input, int min, int max)
-{
-  if (input < min)
-  {
+int Laser::fixBoundary(int input, int min, int max) {
+  if (input < min) {
     return min;
   }
-  if (input > max)
-  {
+  if (input > max) {
     return max;
   }
   return input;
@@ -115,46 +133,72 @@ int Laser::fixBoundary(int input, int min, int max)
  @param green the power the green laser should output from 0 / 255
  @param blue the power the blue laser should output from 0 / 255
 */
-void Laser::setLaserPower(byte red, byte green, byte blue)
-{
-  const byte r = fixBoundary(red, 0, 255);
-  const byte g = fixBoundary(green, 0, 255);
-  const byte b = fixBoundary(blue, 0, 255);
+void Laser::setLaserPower(byte red, byte green, byte blue) {
+  if (_laserOutputDisabled) {
+    return;
+  }
 
-  analogWrite(_redLaserPin, r);
-  analogWrite(_greenLaserPin, g);
-  analogWrite(_blueLaserPin, b);
+  byte r = fixBoundary(red, 0, 255);
+  byte g = fixBoundary(green, 0, 255);
+  byte b = fixBoundary(blue, 0, 255);
+
+  int currentMaxPowerRgb = r + g + b;
+  if (currentMaxPowerRgb > _laserSettings.maxPowerRgb) {
+    // limit the laser power
+    r = _laserSettings.maxPowerRgb * (r / 765);
+    g = _laserSettings.maxPowerRgb * (r / 765);
+    b = _laserSettings.maxPowerRgb * (r / 765);
+  }
+
+  dac1.setVoltageA(map(r, 0, 255, 0, 4096));
+  dac1.setVoltageB(map(g, 0, 255, 0, 4096));
+  dac1.updateDAC();
+
+  dac2.setVoltageA(map(b, 0, 255, 0, 4096));
+  dac2.updateDAC();
+}
+
+/**
+  @brief This function turns off the lasers and disables the possibility to turn them on
+         this can be used in case there is an emergency. Call enableLasers to enable the laser module again
+*/
+void Laser::disableLasers() {
+  _laserOutputDisabled = true;
+}
+
+/**
+  @brief This function enables the laser module to be turned on again 
+*/
+void Laser::enableLasers() {
+  _laserOutputDisabled = false;
 }
 
 /**
  @brief This function checks if the feedback of the galvo's is working by sending them to their maximums positions and reading the feedback signal from the galvo's.
-
  @return boolean true if the test succeeded false if the test fails
 */
-bool Laser::testGalvoFeedback()
-{
-  sendtoRaw(0, 0);
-  delay(100); // Delay to give the galvo's time to reach the position
+bool Laser::testGalvoFeedback() {
+  int previousXFeedback = -9999;
+  int previousYFeedback = -9999;
 
-  sendtoRaw(4000, 4000);
-  delay(100); // Delay to give the galvo's time to reach the position
-  const short xPosFeedback = analogRead(_xGalvoFeedbackSignal);
-  const short yPosFeedback = analogRead(_yGalvoFeedbackSignal);
+  for (int i = -4000; i < 4000; i += 100) {
+    sendTo(-4000, -4000);
+    int xGalvoFeedbackReading = analogRead(_xGalvoFeedbackSignal);
+    int yGalvoFeedbackReading = analogRead(_yGalvoFeedbackSignal);
 
-  sendtoRaw(-4000, -4000);
-  delay(100); // Delay to give the galvo's time to reach the position
-  const bool xGalvoFeedbackWorking = abs(xPosFeedback - analogRead(_xGalvoFeedbackSignal)) > 800;
-  const bool yGalvoFeedbackWorking = abs(yPosFeedback - analogRead(_yGalvoFeedbackSignal)) > 800;
+    if (xGalvoFeedbackReading == previousXFeedback || yGalvoFeedbackReading == previousYFeedback) {
+      return false;
+    }
+  }
 
-  return xGalvoFeedbackWorking && yGalvoFeedbackWorking;
+  return true;
 }
 
 /**
  @brief This function turns the lasers on, the laser will not output power because the watchdog is currently in the HardwareCheck state.
  @brief The watchdog verifies that the laser feedback is working and will change the state to ready if the lasers are turned off and the rest of the hardware check succeeded.
 */
-void Laser::testLaserFeedbackForWatchdog()
-{
+void Laser::testLaserFeedbackForWatchdog() {
   setLaserPower(10, 10, 10);
   delay(10);
   setLaserPower(0, 0, 0);
@@ -165,8 +209,7 @@ void Laser::testLaserFeedbackForWatchdog()
  *
  * @return true if the function succeeds, false if it fails
  */
-bool Laser::hardwareSelfCheck()
-{
+bool Laser::hardwareSelfCheck() {
   const bool galvosWorking = testGalvoFeedback();
   testLaserFeedbackForWatchdog();
   const bool watchdogReady = analogRead(_safeOperationPin) > 800;

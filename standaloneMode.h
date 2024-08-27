@@ -2,30 +2,30 @@
 #define STANDALONEMODE_H
 
 #include "Arduino.h"
+#include "IMode.h"
+#include "OledModule.h"
 
-class Laser
-{
+class StandaloneMode : public IMode {
 public:
-    void init();
-    void sendTo(int x, int y);
-    bool hardwareSelfCheck();
-    void setLaserPower(byte red, byte green, byte blue);
+  void init(WDT_T4<WDT1> &watchdog, OledModule &oled);
+  void execute();
+  void forceStop();
 
 private:
-    int fixBoundary(int input, int min, int max);
-    bool testGalvoFeedback();
-    void testLaserFeedbackForWatchdog();
-    void configureDacs();
-    int mapPositionToResolution(int value);
+  WDT_T4<WDT1> _watchdog;
+  OledModule *_oledModule;
 
-    const byte _safeOperationPin = A2;
-    const byte _yGalvoFeedbackSignal = A3;
-    const byte _xGalvoFeedbackSignal = A4;
+  void drawMenu(int rotaryValue, bool buttonPressed);
+  void drawMainMenu(int rotaryValue, bool buttonPressed);
 
-    int _realTimeYPos = 0; // The y position based on the feedback signal from the galvo
-    int _realTimeXPos = 0; // The x position based on the feedback signal from the galvo
-    int _yPos = 0;
-    int _xPos = 0;
+  int _previousRotaryValue = -999;
+  bool _previousButtonPressed = false;
+
+  bool _executeStandaloneMode = false;
+
+  int _cursorX = 0;
+  int _cursorY = 0;
+  int _currentMenu = 0;
 };
 
 #endif

@@ -9,9 +9,12 @@ struct settingsModel {
   byte maxPowerRgb;
 };
 
-extern settingsModel laserSettings;
+class Settings {
+public:
+  settingsModel setSettings();
+  settingsModel getSettings();
 
-void initSettings();
-void setSettings();
+private:
+};
 
 #endif
