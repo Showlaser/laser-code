@@ -40,9 +40,8 @@ void Laser::configureDacs() {
   dac3.updateDAC();
 }
 
-void Laser::init(WDT_T4<WDT1> &watchdog, settingsModel laserSettings) {
+void Laser::init(WDT_T4<WDT1> &watchdog) {
   _watchdog = watchdog;
-  _laserSettings = laserSettings;
   configureDacs();
 }
 
@@ -143,11 +142,12 @@ void Laser::setLaserPower(byte red, byte green, byte blue) {
   byte b = fixBoundary(blue, 0, 255);
 
   int currentMaxPowerRgb = r + g + b;
-  if (currentMaxPowerRgb > _laserSettings.maxPowerRgb) {
+  settingsModel settings = Settings::getSettings();
+  if (currentMaxPowerRgb > settings.maxPowerRgb) {
     // limit the laser power
-    r = _laserSettings.maxPowerRgb * (r / 765);
-    g = _laserSettings.maxPowerRgb * (r / 765);
-    b = _laserSettings.maxPowerRgb * (r / 765);
+    r = settings.maxPowerRgb * (r / 765);
+    g = settings.maxPowerRgb * (r / 765);
+    b = settings.maxPowerRgb * (r / 765);
   }
 
   dac1.setVoltageA(map(r, 0, 255, 0, 4096));

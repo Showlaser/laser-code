@@ -16,74 +16,66 @@ void OledModule::init() {
     for (;;)
       ;
   }
+
+  display.setTextSize(1);
+  display.setTextColor(WHITE);
+  display.clearDisplay();
+  display.display();
 }
 
 void OledModule::setCursor(int x, int y) {
   display.setCursor(x, y);
+  display.display();
 }
 
 void OledModule::drawline(int startX, int startY, int endX, int endY) {
   display.drawLine(startX, startY, endX, endY, WHITE);
+  display.display();
 }
 
 void OledModule::println(int x, int y, String text) {
   setCursor(x, y);
   display.println(text);
+  display.display();
 }
 
 void OledModule::printCircle(int x, int y) {
   display.fillCircle(x, y, 2, WHITE);
+  display.display();
 }
 
 void OledModule::clearDisplay() {
   display.clearDisplay();
+  display.display();
 }
 
-bool OledModule::checkForButtonPress() {
-  int buttonPressReading = digitalRead(8);
-  if (buttonPressReading != _lastButtonState) {
-    _lastDebounceTime = millis();
-  }
-
-  _lastButtonState = buttonPressReading;
-  if ((millis() - _lastDebounceTime) > _debounceDelay) {
-    if (buttonPressReading != _buttonState) {
-      _buttonState = buttonPressReading;
-      if (_buttonState == 1) {
-        return true;
-      }
-    }
-  }
-
-  return false;
+void OledModule::checkForButtonPress(bool &previousButtonPressed, bool &buttonPressed) {
+  previousButtonPressed = _previousButtonState;
+  buttonPressed = !digitalRead(8);
+  _previousButtonState = buttonPressed;
 }
 
-int OledModule::getRotaryEncoderRotation() {
-  int currentReading = myEnc.read();
-  if (currentReading > _previousReading) {
-    _previousReading = currentReading;
-    return 1;
-  }
-  if (currentReading < _previousReading) {
-    _previousReading = currentReading;
-    return -1;
-  }
+void OledModule::resetRotaryValue() {
+  myEnc.write(0);
+}
 
+void OledModule::getRotaryEncoderRotation(int &previousReading, int &currentReading) {
+  currentReading = myEnc.read() / 4;
+  previousReading = _previousReading;
   _previousReading = currentReading;
-  return 0;
 }
 
-void OledModule::displaySelectableMenuItems(String selectableMenuItems[], String itemToShowCursorAt) {
+void OledModule::displaySelectableMenuItems(String selectableMenuItems[], int selectableMenuItemsLength, String itemToShowCursorAt) {
   const int spaceBetweenItemsPx = 12;
   const int maxItemsToDisplay = 4;
-
-  int menuItemsLength = sizeof(selectableMenuItems) / sizeof(selectableMenuItems[0]);
-  int itemsToIterateOverCount = menuItemsLength > maxItemsToDisplay ? maxItemsToDisplay : menuItemsLength;
+  int itemsToIterateOverCount = selectableMenuItemsLength > maxItemsToDisplay ? maxItemsToDisplay : selectableMenuItemsLength;
 
   for (int i = 0; i < itemsToIterateOverCount; i++) {
-    println(8, i * 12, selectableMenuItems[i]);
+    println(8, i * spaceBetweenItemsPx, selectableMenuItems[i]);
     if (selectableMenuItems[i] == itemToShowCursorAt) {
-      printCircle(3, i * 12);
+      printCircle(3, i * spaceBetweenItemsPx + 3);
     }
   }
+
+  display.display();
 }

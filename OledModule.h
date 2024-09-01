@@ -49,29 +49,34 @@ public:
 
   /**
   @brief reads the value of the rotary encoder button and returns it
-  @returns true if pressed false if not pressed
+  @param previousButtonPressed the previous value of the button press
+  @param buttonPressed the current value of the button press
   */
-  bool checkForButtonPress();
+  void checkForButtonPress(bool &previousButtonPressed, bool &buttonPressed);
+
+  /**
+  @brief resets the value of the rotary encoder and previous reading
+  */
+  void resetRotaryValue();
 
   /**
   @brief reads the value of the rotary encoder knob and returns it
-  @returns -1 if rotated counterclockwise, 0 if nothing changed, 1 if rotated clockwise
+  @param previousReading this parameter will be updated with the previous value of the rotary encoder
+  @param currentReading this parameter will be updated with the current value of the rotary encoder
   */
-  int getRotaryEncoderRotation();
+  void getRotaryEncoderRotation(int &previousReading, int &currentReading);
 
   /**
   @brief displays a menu in which selectable items are shown. A max of 4 items can be shown on the menu. If you need more you need to select a range to display 
   @param selectableMenuItems a string array of selectable items
+  @param selectableMenuItemsLength the length of the selectableMenuItems parameter
   @param selectedItem the name of the current selected item to show the cursor at
   */
-  void displaySelectableMenuItems(String selectableMenuItems[], String itemToShowCursorAt);
+  void displaySelectableMenuItems(String selectableMenuItems[], int selectableMenuItemsLength, String itemToShowCursorAt);
 
 private:
-  int _lastButtonState = 0;
-  unsigned long _lastDebounceTime = 0;
-  unsigned long _debounceDelay = 50;
-  int _buttonState = 0;
   int _previousReading = 0;
+  bool _previousButtonState = false;
 
   const byte _outputA = 2;
   const byte _outputB = 3;

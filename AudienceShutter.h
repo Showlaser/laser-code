@@ -3,8 +3,9 @@
 
 class AudienceShutter {
   public:
-    void moveShutterUp();
-    void moveShutterDown();
+    static void moveShutterUp();
+    static void moveShutterDown();
+    static void stopMoving();
 
   private:
 

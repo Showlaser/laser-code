@@ -1,11 +1,11 @@
-#ifndef MAINMENU_H
-#define MAINMENU_H
+#ifndef STANDALONE_H
+#define STANDALONE_H
 
 #include "Arduino.h"
 #include "IMenu.h"
 #include "OledModule.h"
 
-class MainMenu : public IMenu {
+class StandaloneMenu : public IMenu {
 public:
   void displayMenu(OledModule &oledModule, String &currentSelectedMenu, int rotaryValue, int previousRotaryValue, bool buttonPressed);
   String getMenuName();

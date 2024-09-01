@@ -8,7 +8,7 @@
 class Laser
 {
 public:
-  void init(WDT_T4<WDT1> &watchdog, settingsModel laserSettings);
+  void init(WDT_T4<WDT1> &watchdog);
   void sendTo(int x, int y);
   bool hardwareSelfCheck();
   void setLaserPower(byte red, byte green, byte blue);
@@ -17,7 +17,6 @@ public:
 
 private:
   WDT_T4<WDT1> _watchdog;
-  settingsModel _laserSettings;
 
   int fixBoundary(int input, int min, int max);
   bool testGalvoFeedback();
