@@ -48,11 +48,16 @@ public:
   void clearDisplay();
 
   /**
-  @brief reads the value of the rotary encoder button and returns it
-  @param previousButtonPressed the previous value of the button press
-  @param buttonPressed the current value of the button press
+  @brief reads the value of the rotary encoder button and returns if the button is pressed and let go
+  @returns if the button is pressed and released
   */
-  void checkForButtonPress(bool &previousButtonPressed, bool &buttonPressed);
+  bool checkForButtonPress();
+
+  /**
+    @brief overwrites the current value of the rotary encoder
+    @param value the value to set the rotary encoder to
+  */
+  void overWriteRotaryValue(int value);
 
   /**
   @brief resets the value of the rotary encoder and previous reading
@@ -67,12 +72,17 @@ public:
   void getRotaryEncoderRotation(int &previousReading, int &currentReading);
 
   /**
-  @brief displays a menu in which selectable items are shown. A max of 4 items can be shown on the menu. If you need more you need to select a range to display 
+  @brief displays a menu in which selectable items are shown. A max of 5 items can be shown on the menu. If you need more you need to select a range to display 
   @param selectableMenuItems a string array of selectable items
   @param selectableMenuItemsLength the length of the selectableMenuItems parameter
   @param selectedItem the name of the current selected item to show the cursor at
   */
   void displaySelectableMenuItems(String selectableMenuItems[], int selectableMenuItemsLength, String itemToShowCursorAt);
+
+  /**
+  @brief Displays the made changes
+  */
+  void displayChanges();
 
 private:
   int _previousReading = 0;

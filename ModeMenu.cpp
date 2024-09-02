@@ -1,7 +1,7 @@
 #include "ModeMenu.h"
 #include "GlobalConfig.h"
 
-void ModeMenu::displayMenu(OledModule &oledModule, String &currentSelectedMenu, int rotaryValue, int previousRotaryValue, bool buttonPressed) {
+void ModeMenu::displayMenu(OledModule &oledModule, String &currentSelectedMenu, int rotaryValue, bool buttonPressed) {
   const int menuItemsLength = 2;
   String menuItems[menuItemsLength] = { StandAloneMenuName, ExitMenuName };
   if (rotaryValue < menuItemsLength && rotaryValue >= 0) {
@@ -19,6 +19,8 @@ void ModeMenu::displayMenu(OledModule &oledModule, String &currentSelectedMenu, 
   } else {
     oledModule.resetRotaryValue();
   }
+
+  oledModule.displayChanges();
 }
 
 String ModeMenu::getMenuName() {

@@ -13,7 +13,7 @@
 #include "ProjectionZoneMenu.h"
 #include "AudienceShutter.h"
 #include "GlobalConfig.h"
-//WDT_T4<WDT1> _watchdog;
+WDT_T4<WDT1> _watchdog;
 Laser _laser;
 OledModule _oledModule;
 
@@ -103,11 +103,11 @@ void setLaserStatus(laserStatus status) {
 /**
  @brief configures the build in Teensy watchdog to monitor for software hicups
 */
-/*void configureWatchdog() {
+void configureWatchdog() {
   WDT_timings_t config;
-  config.timeout = 5; // in seconds, 0->128
+  config.timeout = 1;  // in seconds, 0->128
   _watchdog.begin(config);
-}*/
+}
 
 bool emergencyButtonIsPressed() {
   return digitalRead(7) == 1;
@@ -130,23 +130,28 @@ int getSelectedMenuId() {
 void selectMode() {
   const unsigned short timePerFrameInMs = 1000 / _screenRefreshRate;
   if (millis() - _previousScreenUpdate > timePerFrameInMs) {
+    int selectedMenuId = getSelectedMenuId();
+
     int previousReading = 0;
     int currentReading = 0;
-    bool previousRotaryButtonPressed = false;
-    bool rotaryButtonPressed = false;
-
-    _oledModule.checkForButtonPress(previousRotaryButtonPressed, rotaryButtonPressed);
+    bool rotaryButtonPressed = _oledModule.checkForButtonPress();
     _oledModule.getRotaryEncoderRotation(previousReading, currentReading);
 
-    if (previousRotaryButtonPressed != rotaryButtonPressed || currentReading != previousReading) {
+    if (rotaryButtonPressed || currentReading != previousReading || _previousSelectedMenu != _currentSelectedMenu) {
       _oledModule.clearDisplay();
-
-      int selectedMenuId = getSelectedMenuId();
-      _menus[selectedMenuId]->displayMenu(_oledModule, _currentSelectedMenu, currentReading, previousReading, rotaryButtonPressed);
+      _menus[selectedMenuId]->displayMenu(_oledModule, _currentSelectedMenu, currentReading, rotaryButtonPressed);
     }
 
     if (_previousSelectedMenu != _currentSelectedMenu) {
       _previousSelectedMenu = _currentSelectedMenu;
+      _oledModule.resetRotaryValue();
+      _oledModule.clearDisplay();
+
+      rotaryButtonPressed = _oledModule.checkForButtonPress();
+      _oledModule.getRotaryEncoderRotation(previousReading, currentReading);
+
+      selectedMenuId = getSelectedMenuId();
+      _menus[selectedMenuId]->displayMenu(_oledModule, _currentSelectedMenu, currentReading, rotaryButtonPressed);
     }
 
     _previousScreenUpdate = millis();
@@ -162,12 +167,13 @@ void initializeMenus() {
 }
 
 void setup() {
-  // configureWatchdog();
+  Serial.begin(9600);
+  configureWatchdog();
 
   //_laser.init(_watchdog);
 
   _oledModule.init();
-  // _watchdog.feed();
+  _watchdog.feed();
   //_laser.hardwareSelfCheck();
 
   //bool emergencyButtonIsNotConnected = digitalRead(7) == 1;
@@ -180,11 +186,11 @@ void setup() {
   // Ethernet.begin(mac);
   initializeMenus();
 
-  _menus[0]->displayMenu(_oledModule, _currentSelectedMenu, 0, 0, false); // render main menu on startup
+  _menus[0]->displayMenu(_oledModule, _currentSelectedMenu, 0, false);  // render main menu on startup
 }
 
 void loop() {
-  //_watchdog.feed();
+  _watchdog.feed();
   selectMode();
 
   /*if (_client.connected()) {

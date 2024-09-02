@@ -1,30 +1,20 @@
 #include "Settings.h"
 
-/**
- @brief Checks if the array objects in the array are not empty
-
- @param array the array to check
- @return true if the objects in the array do have a default value, false if the the objects in the array do not have a default value
-*/
-bool Settings::arrayIsEmpty(byte array[]) {
-  int emptyValueOccurrences = 0;
-  const unsigned int lengthOfArray = sizeof(byte) / sizeof(array[0]);
-  for (unsigned int i = 0; i < lengthOfArray; i++) {
-    if (i == 255) {
-      emptyValueOccurrences++;
-    }
-  }
-
-  return emptyValueOccurrences == lengthOfArray;
-}
+settingsModel Settings::_currentSettings;
+bool Settings::_settingsInitialized = false;
 
 /**
  @brief Saves the settings to the EEPROM 
 */
-settingsModel Settings::setSettings(settingsModel settings) {
+void Settings::setSettings(settingsModel &settings) {
   _currentSettings = settings;
-  EEPROM.put(0, settings);
-  return settings;
+}
+
+/**
+ @brief saves the cached settings in the EEPROM
+*/
+void Settings::saveSettings() {
+  EEPROM.put(0, _currentSettings);
 }
 
 /**
@@ -33,10 +23,12 @@ settingsModel Settings::setSettings(settingsModel settings) {
 settingsModel Settings::getSettings() {
   settingsModel settings;
 
-  if (arrayIsEmpty(_currentSettings.controllerIp)) {
+  if (_settingsInitialized) {
     settings = _currentSettings;
   } else {
-      EEPROM.get(0, settings);
+    EEPROM.get(0, settings);
+    _settingsInitialized = true;
+    _currentSettings = settings;
   }
 
   return settings;

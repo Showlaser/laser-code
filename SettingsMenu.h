@@ -7,7 +7,7 @@
 
 class SettingsMenu : public IMenu {
 public:
-  void displayMenu(OledModule &oledModule, String &currentSelectedMenu, int rotaryValue, int previousRotaryValue, bool buttonPressed);
+  void displayMenu(OledModule &oledModule, String &currentSelectedMenu, int rotaryValue, bool buttonPressed);
   String getMenuName();
 
 private:

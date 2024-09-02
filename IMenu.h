@@ -14,7 +14,7 @@ public:
   @param previousRotaryValue the previous value of the rotary encoder
   @param buttonPressed if the button is pressed on the rotary encoder
   */
-  virtual void displayMenu(OledModule &oledModule, String &currentSelectedMenu, int rotaryValue, int previousRotaryValue, bool buttonPressed);
+  virtual void displayMenu(OledModule &oledModule, String &currentSelectedMenu, int rotaryValue, bool buttonPressed);
 
   /**
   @brief returns the name of the menu

@@ -15,12 +15,13 @@ struct settingsModel {
 
 class Settings {
 public:
-  static settingsModel setSettings(settingsModel settings);
+  static void setSettings(settingsModel &settings);
+  static void saveSettings();
   static settingsModel getSettings();
 
 private:
   static settingsModel _currentSettings;
-  static bool arrayIsEmpty(byte array[]);
+  static bool _settingsInitialized;
 };
 
 #endif

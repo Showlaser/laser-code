@@ -3,7 +3,7 @@
 
 const String _startProjection = "Start projection";
 
-void StandaloneMenu::displayMenu(OledModule &oledModule, String &currentSelectedMenu, int rotaryValue, int previousRotaryValue, bool buttonPressed) {
+void StandaloneMenu::displayMenu(OledModule &oledModule, String &currentSelectedMenu, int rotaryValue, bool buttonPressed) {
   const int menuItemsLength = 2;
   String menuItems[menuItemsLength] = { _startProjection, ExitMenuName };
   if (rotaryValue < menuItemsLength && rotaryValue >= 0) {
@@ -18,12 +18,15 @@ void StandaloneMenu::displayMenu(OledModule &oledModule, String &currentSelected
       if (itemToShowCursorAt == ExitMenuName) {
         CurrentLaserMode = LaserMode::NotSelected;
         currentSelectedMenu = ModeSelectMenuName;
+        oledModule.displayChanges();
         return;
       }
     }
   } else {
     oledModule.resetRotaryValue();
   }
+
+  oledModule.displayChanges();
 }
 
 String StandaloneMenu::getMenuName() {
