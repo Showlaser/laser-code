@@ -20,10 +20,10 @@ void Laser::configureDacs() {
   dac3.turnOnChannelB();
 
   // Configure DACs' channels in High gain mode (optional, as it's the default)
-  dac1.setGainA(MCP4822::Low);
-  dac1.setGainB(MCP4822::Low);
-  dac2.setGainA(MCP4822::Low);
-  dac2.setGainB(MCP4822::Low);
+  dac1.setGainA(MCP4822::High);
+  dac1.setGainB(MCP4822::High);
+  dac2.setGainA(MCP4822::High);
+  dac2.setGainB(MCP4822::High);
   dac3.setGainA(MCP4822::Low);
   dac3.setGainB(MCP4822::Low);
 
@@ -46,14 +46,6 @@ void Laser::init(WDT_T4<WDT1> &watchdog) {
 }
 
 /**
-   @brief set input parameters within valid limits, creates a linear voltage from the previous to the new point (zigzag) and sends it to the laser.
-   The zigzag is created to prevent the galvos from moving very abruptly to the next position which will cause the power supply to go into protection mode
-
-   @param xPos the position for the x axis galvo to move to
-   @param yPos the position for the y axis galvo to move to
-*/
-
-/**
   @brief sends the galvos to the specified position using logistic growth 
 */
 void Laser::sendTo(int newXPos, int newYPos) {
@@ -62,12 +54,12 @@ void Laser::sendTo(int newXPos, int newYPos) {
   int xPos = fixBoundary(newXPos, -4000, 4000);
   int yPos = fixBoundary(newYPos, -4000, 4000);
 
-  int durationXGalvo = abs(xPos - _xPos) / 2;  // Duration of the entire cycle in microseconds
-  int durationYGalvo = abs(yPos - _yPos) / 2;  // Duration of the entire cycle in microseconds
+  int durationXGalvo = abs(xPos - _xPos) + 30;
+  int durationYGalvo = abs(yPos - _yPos) + 30;
   int duration = (durationXGalvo >= durationYGalvo ? durationXGalvo : durationYGalvo);
 
   float middlePoint = duration / 2.0;
-  float growRate = 0.008;
+  float growRate = 0.0012;
 
   unsigned long startTime = micros();
   unsigned long endTime = startTime + duration;
@@ -77,21 +69,21 @@ void Laser::sendTo(int newXPos, int newYPos) {
     float elapsedTime = micros() - startTime;
 
     if (_xPos < xPos) {
-      int xMappedToVoltage = xPos = map(xPos, -4000, 4000, 0, 4096);
+      int xMappedToVoltage = map(xPos, -4000, 4000, 0, 4096);
       float xVoltage = xMappedToVoltage / (1.0 + exp(-growRate * (elapsedTime - middlePoint)));
       dac3.setVoltageA(xVoltage);
     } else {
-      int xMappedToVoltage = xPos = map(xPos, -4000, 4000, 0, 4096);
+      int xMappedToVoltage = map(xPos, -4000, 4000, 0, 4096);
       float xVoltage = xMappedToVoltage / (1.0 + exp(-growRate * ((duration - elapsedTime) - middlePoint)));
       dac3.setVoltageA(xVoltage);
     }
 
     if (_yPos < yPos) {
-      int yMappedToVoltage = yPos = map(xPos, -4000, 4000, 0, 4096);
+      int yMappedToVoltage = map(xPos, -4000, 4000, 0, 4096);
       float yVoltage = yMappedToVoltage / (1.0 + exp(-growRate * (elapsedTime - middlePoint)));
       dac3.setVoltageB(yVoltage);
     } else {
-      int yMappedToVoltage = yPos = map(xPos, -4000, 4000, 0, 4096);
+      int yMappedToVoltage = map(xPos, -4000, 4000, 0, 4096);
       float yVoltage = yMappedToVoltage / (1.0 + exp(-growRate * ((duration - elapsedTime) - middlePoint)));
       dac3.setVoltageB(yVoltage);
     }
@@ -126,35 +118,35 @@ int Laser::fixBoundary(int input, int min, int max) {
 
 /**
  @brief This function sets the power of the laser by the provided values.
- @brief Values below 0 will be set to 0 and values above 255 will be set to 255
+ @brief Values below 0 will be set to 0 and values above 100 will be set to 100
 
- @param red the power the red laser should output from 0 / 255
- @param green the power the green laser should output from 0 / 255
- @param blue the power the blue laser should output from 0 / 255
+ @param red the power the red laser should output from 0 / 100
+ @param green the power the green laser should output from 0 / 100
+ @param blue the power the blue laser should output from 0 / 100
 */
 void Laser::setLaserPower(byte red, byte green, byte blue) {
   if (_laserOutputDisabled) {
     return;
   }
 
-  byte r = fixBoundary(red, 0, 255);
-  byte g = fixBoundary(green, 0, 255);
-  byte b = fixBoundary(blue, 0, 255);
+  byte r = fixBoundary(red, 0, 100);
+  byte g = fixBoundary(green, 0, 100);
+  byte b = fixBoundary(blue, 0, 100);
 
-  int currentMaxPowerRgb = r + g + b;
+  int currentMaxPowerRgbPercentage = r + g + b;
   settingsModel settings = Settings::getSettings();
-  if (currentMaxPowerRgb > settings.maxPowerRgb) {
+  if (currentMaxPowerRgbPercentage > settings.maxPowerPerlaserInPercentage) {
     // limit the laser power
-    r = settings.maxPowerRgb * (r / 765);
-    g = settings.maxPowerRgb * (r / 765);
-    b = settings.maxPowerRgb * (r / 765);
+    r = settings.maxPowerPerlaserInPercentage * (r / 100);
+    g = settings.maxPowerPerlaserInPercentage * (r / 100);
+    b = settings.maxPowerPerlaserInPercentage * (r / 100);
   }
 
-  dac1.setVoltageA(map(r, 0, 255, 0, 4096));
-  dac1.setVoltageB(map(g, 0, 255, 0, 4096));
+  dac1.setVoltageA(map(r, 0, 100, 0, 3750));
+  dac1.setVoltageB(map(g, 0, 100, 0, 3750));
   dac1.updateDAC();
 
-  dac2.setVoltageA(map(b, 0, 255, 0, 4096));
+  dac2.setVoltageA(map(b, 0, 100, 0, 3750));
   dac2.updateDAC();
 }
 
@@ -163,6 +155,13 @@ void Laser::setLaserPower(byte red, byte green, byte blue) {
          this can be used in case there is an emergency. Call enableLasers to enable the laser module again
 */
 void Laser::disableLasers() {
+  dac1.setVoltageA(0);
+  dac1.setVoltageB(0);
+  dac1.updateDAC();
+
+  dac2.setVoltageA(0);
+  dac2.updateDAC();
+
   _laserOutputDisabled = true;
 }
 
@@ -178,41 +177,17 @@ void Laser::enableLasers() {
  @return boolean true if the test succeeded false if the test fails
 */
 bool Laser::testGalvoFeedback() {
-  int previousXFeedback = -9999;
-  int previousYFeedback = -9999;
+  sendTo(-4000, -4000);
+  delay(500);
 
-  for (int i = -4000; i < 4000; i += 100) {
-    sendTo(-4000, -4000);
-    int xGalvoFeedbackReading = analogRead(_xGalvoFeedbackSignal);
-    int yGalvoFeedbackReading = analogRead(_yGalvoFeedbackSignal);
+  int previousXFeedback = analogRead(_xGalvoFeedbackSignal);
+  int previousYFeedback = analogRead(_yGalvoFeedbackSignal);
 
-    if (xGalvoFeedbackReading == previousXFeedback || yGalvoFeedbackReading == previousYFeedback) {
-      return false;
-    }
-  }
+  sendTo(4000, 4000);
+  delay(500);
 
-  return true;
-}
+  int xGalvoFeedbackReading = analogRead(_xGalvoFeedbackSignal);
+  int yGalvoFeedbackReading = analogRead(_yGalvoFeedbackSignal);
 
-/**
- @brief This function turns the lasers on, the laser will not output power because the watchdog is currently in the HardwareCheck state.
- @brief The watchdog verifies that the laser feedback is working and will change the state to ready if the lasers are turned off and the rest of the hardware check succeeded.
-*/
-void Laser::testLaserFeedbackForWatchdog() {
-  setLaserPower(10, 10, 10);
-  delay(10);
-  setLaserPower(0, 0, 0);
-}
-
-/**
- * @brief Performs a hardware check for the galvo's and the laser readout
- *
- * @return true if the function succeeds, false if it fails
- */
-bool Laser::hardwareSelfCheck() {
-  const bool galvosWorking = testGalvoFeedback();
-  testLaserFeedbackForWatchdog();
-  const bool watchdogReady = analogRead(_safeOperationPin) > 800;
-
-  return galvosWorking && watchdogReady;
+  return abs(previousXFeedback - xGalvoFeedbackReading) > 100 && abs(previousYFeedback - yGalvoFeedbackReading) > 100;
 }

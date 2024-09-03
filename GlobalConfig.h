@@ -12,6 +12,8 @@ extern const String ProjectionZoneMenuName;
 extern const String ControllerIpMenuName;
 extern const String ExitMenuName;
 
+extern const String BreathingCircleAnimationName;
+
 enum LaserMode {
   NotSelected = 0, // The showlaser will not go into a mode
   Standalone = 1,  // The showlaser is not connected to a controller and is working standalone

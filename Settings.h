@@ -6,11 +6,11 @@
 
 struct settingsModel {
   byte controllerIp[4];
-  byte maxPowerRgb;
-  byte projectionWidthInPercentage;
-  byte projectionHeightInPercentage;
-  byte projectionOffsetXInPercentage;
-  byte projectionOffsetYInPercentage;
+  byte maxPowerPerlaserInPercentage;
+  byte projectionTopInPercentage;
+  byte projectionBottomInPercentage;
+  byte projectionLeftInPercentage;
+  byte projectionRightInPercentage;
 };
 
 class Settings {

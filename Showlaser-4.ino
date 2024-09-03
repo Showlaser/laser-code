@@ -13,12 +13,20 @@
 #include "ProjectionZoneMenu.h"
 #include "AudienceShutter.h"
 #include "GlobalConfig.h"
+#include "IMode.h"
+#include "StandaloneMode.h"
+
 WDT_T4<WDT1> _watchdog;
 Laser _laser;
 OledModule _oledModule;
 
 EthernetClient _client;
 IPAddress _server;
+
+const int _modesLength = 1;
+IMode* _modes[_modesLength];
+
+LaserMode _previousSelectedLaserMode = LaserMode::NotSelected;
 
 const int _menusLength = 5;
 IMenu* _menus[_menusLength];
@@ -28,8 +36,6 @@ String _currentSelectedMenu = MainMenuName;  // The current selected menu name
 
 unsigned long _previousScreenUpdate = 0;
 unsigned short _screenRefreshRate = 24;  // Fps
-
-unsigned long _previousSettingsCheck = 0;
 
 enum laserStatus {
   Defect = 0,                      // An hardware defect has been detected and the showlaser is locked due to safety reasons
@@ -67,7 +73,7 @@ void setLaserStatus(laserStatus status) {
     }
   }
   if (status == laserStatus::Ready) {
-    _laser.hardwareSelfCheck();
+    _laser.testGalvoFeedback();
     // TODO do stuff with the led infront
   }
   if (status == laserStatus::ConnectionToControllerLost) {
@@ -105,16 +111,38 @@ void setLaserStatus(laserStatus status) {
 */
 void configureWatchdog() {
   WDT_timings_t config;
-  config.timeout = 1;  // in seconds, 0->128
+  config.timeout = 15;  // in seconds, 0->128
   _watchdog.begin(config);
 }
 
-bool emergencyButtonIsPressed() {
+void initializeMenus() {
+  _menus[0] = new MainMenu();
+  _menus[1] = new ModeMenu();
+  _menus[2] = new StandaloneMenu();
+  _menus[3] = new SettingsMenu();
+  _menus[4] = new ProjectionZoneMenu();
+}
+
+void initializeModes() {
+  _modes[0] = new StandaloneMode(_laser);
+}
+
+bool emergencyButtonIsPressedOrDisconnected() {
   return digitalRead(7) == 1;
 }
 
-void setLaserInEmergencyMode() {
-  _laser.disableLasers();
+void executeEmergencyButtonProtocol() {
+  if (emergencyButtonIsPressedOrDisconnected()) {
+    _laser.disableLasers();
+    _oledModule.clearDisplay();
+    _oledModule.println(3, 3, "Emergency button pressed or disconnected! Restart required");
+    _oledModule.displayChanges();
+
+    while (true) {
+      // prevent laser from executing commands
+      _watchdog.feed();
+    }
+  }
 }
 
 int getSelectedMenuId() {
@@ -127,7 +155,7 @@ int getSelectedMenuId() {
   return 0;
 }
 
-void selectMode() {
+void renderOledMenu() {
   const unsigned short timePerFrameInMs = 1000 / _screenRefreshRate;
   if (millis() - _previousScreenUpdate > timePerFrameInMs) {
     int selectedMenuId = getSelectedMenuId();
@@ -158,40 +186,60 @@ void selectMode() {
   }
 }
 
-void initializeMenus() {
-  _menus[0] = new MainMenu();
-  _menus[1] = new ModeMenu();
-  _menus[2] = new StandaloneMenu();
-  _menus[3] = new SettingsMenu();
-  _menus[4] = new ProjectionZoneMenu();
+int getSelectedModeId() {
+  for (int i = 0; i < _modesLength; i++) {
+    if (_modes[i]->getModeName() == CurrentLaserMode) {
+      return i;
+    }
+  }
+
+  return -1;
+}
+
+void executeSelectedMode() {
+  if (CurrentLaserMode != LaserMode::NotSelected) {
+    int selectedModeId = getSelectedModeId();
+    if (selectedModeId == -1) {
+      return;
+    }
+
+    _modes[selectedModeId]->execute();
+  }
 }
 
 void setup() {
-  Serial.begin(9600);
   configureWatchdog();
+  Serial.begin(9600);
 
-  //_laser.init(_watchdog);
+  _laser.init(_watchdog);
 
   _oledModule.init();
   _watchdog.feed();
-  //_laser.hardwareSelfCheck();
 
-  //bool emergencyButtonIsNotConnected = digitalRead(7) == 1;
-  //while (emergencyButtonIsNotConnected) {
-  // todo set protocol for this case
-  // }
+  while (emergencyButtonIsPressedOrDisconnected()) {
+    // todo set protocol for this case
+    _oledModule.println(3, 3, "Emergency button pressed or disconnected!");
+    _oledModule.displayChanges();
+    _watchdog.feed();
+  }
+
+  _laser.enableLasers();
+
   // TODO move to controller class
   // byte mac[6];
   // teensyMAC(mac);
   // Ethernet.begin(mac);
   initializeMenus();
+  initializeModes();
 
   _menus[0]->displayMenu(_oledModule, _currentSelectedMenu, 0, false);  // render main menu on startup
 }
 
 void loop() {
   _watchdog.feed();
-  selectMode();
+  renderOledMenu();
+
+  executeEmergencyButtonProtocol();
 
   /*if (_client.connected()) {
   } else {

@@ -10,4 +10,6 @@ const String ProjectionZoneMenuName = "Projection zone";
 const String ControllerIpMenuName = "Controller IP";
 const String ExitMenuName = "Exit";
 
+const String BreathingCircleAnimationName = "Breathing circle animation";
+
 LaserMode CurrentLaserMode = LaserMode::NotSelected;

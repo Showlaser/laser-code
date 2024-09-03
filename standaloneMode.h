@@ -3,29 +3,29 @@
 
 #include "Arduino.h"
 #include "IMode.h"
-#include "OledModule.h"
+#include "Laser.h"
 
 class StandaloneMode : public IMode {
 public:
-  void init(WDT_T4<WDT1> &watchdog, OledModule &oled);
+  StandaloneMode(Laser &laser);
+ 
   void execute();
-  void forceStop();
+  void stop();
+  virtual LaserMode getModeName();
 
 private:
-  WDT_T4<WDT1> _watchdog;
-  OledModule *_oledModule;
+  Laser& _laser;
+  unsigned long _firstExecutionStartedAtMillis;
+  unsigned long _animationStartedAtMillis;
+  int _timePerAnimationInSeconds;
+  unsigned long _animationsTotalDuration;
+  String _nameOfCurrentAnimationToDisplay;
 
-  void drawMenu(int rotaryValue, bool buttonPressed);
-  void drawMainMenu(int rotaryValue, bool buttonPressed);
-
-  int _previousRotaryValue = -999;
-  bool _previousButtonPressed = false;
-
-  bool _executeStandaloneMode = false;
-
-  int _cursorX = 0;
-  int _cursorY = 0;
-  int _currentMenu = 0;
+  /**
+  @brief calculates the animation id by time in millis, the maximum time based on the  _firstExecutionStartedAtMillis, _timePerAnimationInSeconds and _animationsLength fields
+  @returns the current animation id that should be displayed
+  */
+  int getSelectedAnimationId();
 };
 
 #endif

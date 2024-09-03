@@ -5,19 +5,22 @@
  @brief Moves the shutter up
 */
 void AudienceShutter::moveShutterUp() {
-  digitalWrite(20, HIGH);
-  digitalWrite(21, LOW);
+  Serial.println("Move up");
+  analogWrite(28, 125);
+  analogWrite(29, 0);
 }
 
 /**
  @brief Moves the shutter down
 */
 void AudienceShutter::moveShutterDown() {
-  digitalWrite(20, LOW);
-  digitalWrite(21, HIGH);
+  Serial.println("Move down");
+  analogWrite(28, 0);
+  analogWrite(29, 125);
 }
 
 void AudienceShutter::stopMoving() {
-  digitalWrite(20, LOW);
-  digitalWrite(21, LOW);
+    Serial.println("Stop");
+  analogWrite(28, 0);
+  analogWrite(29, 0);
 }

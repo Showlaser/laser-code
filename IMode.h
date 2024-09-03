@@ -1,11 +1,18 @@
-#include "Watchdog_t4.h"
-#include "OledModule.h"
+#ifndef IMODE_H
+#define IMODE_H
 
-class IMode
-{
+#include "GlobalConfig.h"
+
+class IMode {
 public:
-    virtual void init(WDT_T4<WDT1> &watchdog, OledModule oled) = 0;
-    virtual void execute() = 0;
-    virtual void forceStop();
-    virtual ~IMode() {}
+  /**
+  @brief Executes the mode
+  */
+  virtual void execute();
+  virtual LaserMode getModeName();
+  virtual ~IMode() {}
+
+private:
 };
+
+#endif
