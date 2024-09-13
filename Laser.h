@@ -19,7 +19,6 @@ private:
 
   int fixBoundary(int input, int min, int max);
   void configureDacs();
-  void logisticGrowthCurve(int startValue, int endValue, int duration, float growRate);
 
   const byte _yGalvoFeedbackSignal = A2;
   const byte _xGalvoFeedbackSignal = A3;

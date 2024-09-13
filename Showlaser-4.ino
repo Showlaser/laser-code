@@ -15,6 +15,7 @@
 #include "GlobalConfig.h"
 #include "IMode.h"
 #include "StandaloneMode.h"
+#include "AudienceShutterMenu.h"
 
 WDT_T4<WDT1> _watchdog;
 Laser _laser;
@@ -28,7 +29,7 @@ IMode* _modes[_modesLength];
 
 LaserMode _previousSelectedLaserMode = LaserMode::NotSelected;
 
-const int _menusLength = 5;
+const int _menusLength = 6;
 IMenu* _menus[_menusLength];
 
 String _previousSelectedMenu = "";           // The previous selected menu name
@@ -111,7 +112,7 @@ void setLaserStatus(laserStatus status) {
 */
 void configureWatchdog() {
   WDT_timings_t config;
-  config.timeout = 15;  // in seconds, 0->128
+  config.timeout = 5;  // in seconds, 0->128
   _watchdog.begin(config);
 }
 
@@ -121,6 +122,7 @@ void initializeMenus() {
   _menus[2] = new StandaloneMenu();
   _menus[3] = new SettingsMenu();
   _menus[4] = new ProjectionZoneMenu();
+  _menus[5] = new AudienceShutterMenu();
 }
 
 void initializeModes() {
@@ -200,16 +202,22 @@ void executeSelectedMode() {
   if (CurrentLaserMode != LaserMode::NotSelected) {
     int selectedModeId = getSelectedModeId();
     if (selectedModeId == -1) {
+      _laser.setLaserPower(0, 0, 0);
       return;
     }
 
     _modes[selectedModeId]->execute();
+    _previousSelectedLaserMode = CurrentLaserMode; 
+  } else if (CurrentLaserMode == LaserMode::NotSelected && _previousSelectedLaserMode != LaserMode::NotSelected) {
+    _laser.setLaserPower(0, 0, 0);
+    _previousSelectedLaserMode = CurrentLaserMode;
   }
 }
 
 void setup() {
   configureWatchdog();
   Serial.begin(9600);
+  randomSeed(analogRead(0));
 
   _laser.init(_watchdog);
 
@@ -217,7 +225,6 @@ void setup() {
   _watchdog.feed();
 
   while (emergencyButtonIsPressedOrDisconnected()) {
-    // todo set protocol for this case
     _oledModule.println(3, 3, "Emergency button pressed or disconnected!");
     _oledModule.displayChanges();
     _watchdog.feed();
@@ -225,10 +232,6 @@ void setup() {
 
   _laser.enableLasers();
 
-  // TODO move to controller class
-  // byte mac[6];
-  // teensyMAC(mac);
-  // Ethernet.begin(mac);
   initializeMenus();
   initializeModes();
 
@@ -240,11 +243,5 @@ void loop() {
   renderOledMenu();
 
   executeEmergencyButtonProtocol();
-
-  /*if (_client.connected()) {
-  } else {
-    _laser.setLaserPower(0, 0, 0);
-    _client.stop();
-    setLaserStatus(laserStatus::ConnectionToControllerLost);
-  }*/
+  executeSelectedMode();
 }

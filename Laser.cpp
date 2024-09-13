@@ -54,9 +54,19 @@ void Laser::sendTo(int newXPos, int newYPos) {
   int xPos = fixBoundary(newXPos, -4000, 4000);
   int yPos = fixBoundary(newYPos, -4000, 4000);
 
+  settingsModel settings = Settings::getSettings();
+  int projectionTopInPx = map(settings.projectionTopInPercentage, 0, 100, -4000, 4000);
+  int projectionBottomInPx = map(settings.projectionBottomInPercentage, 0, 100, 4000, -4000);
+
+  int projectionLeftInPx = map(settings.projectionLeftInPercentage, 0, 100, -4000, 4000);
+  int projectionRightInPx = map(settings.projectionRightInPercentage, 0, 100, 4000, -4000);
+
+  xPos = map(xPos, -4000, 4000, projectionLeftInPx, projectionRightInPx);
+  yPos = map(yPos, -4000, 4000, projectionBottomInPx, projectionTopInPx);
+
   int durationXGalvo = abs(xPos - _xPos) + 30;
   int durationYGalvo = abs(yPos - _yPos) + 30;
-  int duration = (durationXGalvo >= durationYGalvo ? durationXGalvo : durationYGalvo);
+  int duration = (durationXGalvo >= durationYGalvo ? durationXGalvo : durationYGalvo) / 5;
 
   float middlePoint = duration / 2.0;
   float growRate = 0.0012;
@@ -64,32 +74,14 @@ void Laser::sendTo(int newXPos, int newYPos) {
   unsigned long startTime = micros();
   unsigned long endTime = startTime + duration;
 
-  // positive or negative logistic growth curves this helps to smooth the galvo movement
-  while (micros() < endTime) {
-    float elapsedTime = micros() - startTime;
+  int xMappedToVoltage = map(xPos, -4000, 4000, 0, 4096);
+  dac3.setVoltageA(xMappedToVoltage);
 
-    if (_xPos < xPos) {
-      int xMappedToVoltage = map(xPos, -4000, 4000, 0, 4096);
-      float xVoltage = xMappedToVoltage / (1.0 + exp(-growRate * (elapsedTime - middlePoint)));
-      dac3.setVoltageA(xVoltage);
-    } else {
-      int xMappedToVoltage = map(xPos, -4000, 4000, 0, 4096);
-      float xVoltage = xMappedToVoltage / (1.0 + exp(-growRate * ((duration - elapsedTime) - middlePoint)));
-      dac3.setVoltageA(xVoltage);
-    }
+  int yMappedToVoltage = map(yPos, -4000, 4000, 0, 4096);
+  dac3.setVoltageB(yMappedToVoltage);
+  dac3.updateDAC();
 
-    if (_yPos < yPos) {
-      int yMappedToVoltage = map(xPos, -4000, 4000, 0, 4096);
-      float yVoltage = yMappedToVoltage / (1.0 + exp(-growRate * (elapsedTime - middlePoint)));
-      dac3.setVoltageB(yVoltage);
-    } else {
-      int yMappedToVoltage = map(xPos, -4000, 4000, 0, 4096);
-      float yVoltage = yMappedToVoltage / (1.0 + exp(-growRate * ((duration - elapsedTime) - middlePoint)));
-      dac3.setVoltageB(yVoltage);
-    }
-
-    dac3.updateDAC();
-  }
+  delayMicroseconds(duration);
 
   _xPos = xPos;
   _yPos = yPos;
@@ -126,6 +118,7 @@ int Laser::fixBoundary(int input, int min, int max) {
 */
 void Laser::setLaserPower(byte red, byte green, byte blue) {
   if (_laserOutputDisabled) {
+    Serial.println("Output disabled!");
     return;
   }
 
@@ -135,18 +128,18 @@ void Laser::setLaserPower(byte red, byte green, byte blue) {
 
   int currentMaxPowerRgbPercentage = r + g + b;
   settingsModel settings = Settings::getSettings();
-  if (currentMaxPowerRgbPercentage > settings.maxPowerPerlaserInPercentage) {
+  if (currentMaxPowerRgbPercentage > (settings.maxPowerPerlaserInPercentage * 3)) {
     // limit the laser power
     r = settings.maxPowerPerlaserInPercentage * (r / 100);
     g = settings.maxPowerPerlaserInPercentage * (r / 100);
     b = settings.maxPowerPerlaserInPercentage * (r / 100);
   }
 
-  dac1.setVoltageA(map(r, 0, 100, 0, 3750));
-  dac1.setVoltageB(map(g, 0, 100, 0, 3750));
+  dac1.setVoltageA(map(r, 0, 100, 0, 3500));
+  dac1.setVoltageB(map(g, 0, 100, 50, 3900));
   dac1.updateDAC();
 
-  dac2.setVoltageA(map(b, 0, 100, 0, 3750));
+  dac2.setVoltageA(map(b, 0, 100, 0, 2750));
   dac2.updateDAC();
 }
 

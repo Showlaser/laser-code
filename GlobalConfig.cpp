@@ -8,8 +8,13 @@ const String ControllerMenuName = "Controller mode";
 const String SettingsMenuName = "Settings";
 const String ProjectionZoneMenuName = "Projection zone";
 const String ControllerIpMenuName = "Controller IP";
+const String AudienceShutterMenuName = "Audience shutter";
 const String ExitMenuName = "Exit";
 
-const String BreathingCircleAnimationName = "Breathing circle animation";
+const String RandomDotsAnimationName = "Random dots";
+const String LineAnimationName = "Line";
+const String CircleAnimationName = "Circle";
+const String MovingLinesAnimationName = "Moving Lines";
+const String WideningLinesAnimationName = "Widening Lines";
 
 LaserMode CurrentLaserMode = LaserMode::NotSelected;

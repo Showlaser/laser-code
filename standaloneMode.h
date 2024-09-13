@@ -17,7 +17,7 @@ private:
   Laser& _laser;
   unsigned long _firstExecutionStartedAtMillis;
   unsigned long _animationStartedAtMillis;
-  int _timePerAnimationInSeconds;
+  unsigned int _timePerAnimationInSeconds;
   unsigned long _animationsTotalDuration;
   String _nameOfCurrentAnimationToDisplay;
 
