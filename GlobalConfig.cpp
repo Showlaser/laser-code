@@ -14,7 +14,7 @@ const String ExitMenuName = "Exit";
 const String RandomDotsAnimationName = "Random dots";
 const String LineAnimationName = "Line";
 const String CircleAnimationName = "Circle";
-const String MovingLinesAnimationName = "Moving Lines";
 const String WideningLinesAnimationName = "Widening Lines";
+const String RotatingPointsAnimationName = "Rotating Points";
 
 LaserMode CurrentLaserMode = LaserMode::NotSelected;

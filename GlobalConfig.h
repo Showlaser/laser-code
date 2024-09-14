@@ -16,8 +16,8 @@ extern const String ExitMenuName;
 extern const String RandomDotsAnimationName;
 extern const String LineAnimationName;
 extern const String CircleAnimationName;
-extern const String MovingLinesAnimationName;
 extern const String WideningLinesAnimationName;
+extern const String RotatingPointsAnimationName;
 
   enum LaserMode {
     NotSelected = 0,  // The showlaser will not go into a mode

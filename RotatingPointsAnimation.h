@@ -1,17 +1,18 @@
-#ifndef MOVINGLINESANIMATION_H
-#define MOVINGLINESANIMATION_H
+#ifndef ROTATINGPOINTSANIMATION_H
+#define ROTATINGPOINTSANIMATION_H
 
 #include "Arduino.h"
 #include "IStandaloneAnimation.h"
 #include "Laser.h"
 
-class MovingLinesAnimation : public IStandaloneAnimation {
+class RotatingPointsAnimation : public IStandaloneAnimation {
 public:
-  MovingLinesAnimation(Laser &laser);
+  RotatingPointsAnimation(Laser& laser);
   String getAnimationName();
   void execute(unsigned long animationStartedAtMillis, int timePerAnimationInMilliSeconds);
 
 private:
+  float theta_rotate;
   Laser& _laser;
 };
 

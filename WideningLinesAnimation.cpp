@@ -15,6 +15,7 @@ void WideningLinesAnimation::execute(unsigned long animationStartedAtMillis, int
     random(settings.maxPowerPerlaserInPercentage / 1.5, settings.maxPowerPerlaserInPercentage),
     random(settings.maxPowerPerlaserInPercentage / 1.5, settings.maxPowerPerlaserInPercentage)
   };
+
   int y = random(-4000, 4000);
 
   for (int i = 0; i < 40; i++) {

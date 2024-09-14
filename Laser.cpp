@@ -64,15 +64,25 @@ void Laser::sendTo(int newXPos, int newYPos) {
   xPos = map(xPos, -4000, 4000, projectionLeftInPx, projectionRightInPx);
   yPos = map(yPos, -4000, 4000, projectionBottomInPx, projectionTopInPx);
 
-  int durationXGalvo = abs(xPos - _xPos) + 30;
-  int durationYGalvo = abs(yPos - _yPos) + 30;
-  int duration = (durationXGalvo >= durationYGalvo ? durationXGalvo : durationYGalvo) / 5;
+  int differenceX = (int)(max(_xPos, xPos) - min(_xPos, xPos));
+  int differenceY = (int)(max(_yPos, yPos) - min(_yPos, yPos));
+  int difference = max(differenceX, differenceY);
 
-  float middlePoint = duration / 2.0;
-  float growRate = 0.0012;
+  const float alpha = 0.03;  // Lower values provide more smoothing
 
-  unsigned long startTime = micros();
-  unsigned long endTime = startTime + duration;
+  int steps = (int)(difference * 0.05);
+  for (int i = 0; i < steps; i++) {
+    // Apply low-pass filter gradually to move toward target values
+    int x = _xPos + alpha * (xPos - _xPos);
+    int y = _yPos + alpha * (yPos - _yPos);
+
+    int xMappedToVoltage = map(x, -4000, 4000, 0, 4096);
+    dac3.setVoltageA(xMappedToVoltage);
+
+    int yMappedToVoltage = map(y, -4000, 4000, 0, 4096);
+    dac3.setVoltageB(yMappedToVoltage);
+    dac3.updateDAC();
+  }
 
   int xMappedToVoltage = map(xPos, -4000, 4000, 0, 4096);
   dac3.setVoltageA(xMappedToVoltage);
@@ -81,12 +91,10 @@ void Laser::sendTo(int newXPos, int newYPos) {
   dac3.setVoltageB(yMappedToVoltage);
   dac3.updateDAC();
 
-  delayMicroseconds(duration);
+  _watchdog.feed();
 
   _xPos = xPos;
   _yPos = yPos;
-
-  _watchdog.feed();
 }
 
 /**
@@ -118,7 +126,6 @@ int Laser::fixBoundary(int input, int min, int max) {
 */
 void Laser::setLaserPower(byte red, byte green, byte blue) {
   if (_laserOutputDisabled) {
-    Serial.println("Output disabled!");
     return;
   }
 
@@ -141,6 +148,7 @@ void Laser::setLaserPower(byte red, byte green, byte blue) {
 
   dac2.setVoltageA(map(b, 0, 100, 0, 2750));
   dac2.updateDAC();
+  delayMicroseconds(5);
 }
 
 /**
