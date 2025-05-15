@@ -1,4 +1,3 @@
-#include <NativeEthernet.h>
 #include "Laser.h"
 #include <ArduinoJson.h>
 #include <queue>
@@ -20,9 +19,7 @@
 WDT_T4<WDT1> _watchdog;
 Laser _laser;
 OledModule _oledModule;
-
-EthernetClient _client;
-IPAddress _server;
+NetworkController _networkController;
 
 const int _modesLength = 1;
 IMode* _modes[_modesLength];
@@ -32,11 +29,11 @@ LaserMode _previousSelectedLaserMode = LaserMode::NotSelected;
 const int _menusLength = 6;
 IMenu* _menus[_menusLength];
 
-String _previousSelectedMenu = "";           // The previous selected menu name
-String _currentSelectedMenu = MainMenuName;  // The current selected menu name
+String _previousSelectedMenu = "";      
+String _currentSelectedMenu = MainMenuName;
 
 unsigned long _previousScreenUpdate = 0;
-unsigned short _screenRefreshRate = 24;  // Fps
+unsigned short _screenRefreshRate = 24;
 
 enum laserStatus {
   Defect = 0,                      // An hardware defect has been detected and the showlaser is locked due to safety reasons
@@ -46,20 +43,6 @@ enum laserStatus {
 };
 
 laserStatus _currentLaserStatus;
-
-/**
-  @brief Generate a MAC address for the Teensy
-
-  @param mac the variable too write the mac address to
- */
-/*void teensyMAC(uint8_t* mac) {
-  for (uint8_t by = 0; by < 2; by++) {
-    mac[by] = (HW_OCOTP_MAC1 >> ((1 - by) * 8)) & 0xFF;
-  }
-  for (uint8_t by = 0; by < 4; by++) {
-    mac[by + 2] = (HW_OCOTP_MAC0 >> ((3 - by) * 8)) & 0xFF;
-  }
-}*/
 
 /**
  @brief Sets the status of the laser and performs certain actions based on the status
@@ -86,33 +69,11 @@ void setLaserStatus(laserStatus status) {
 }
 
 /**
-  @brief This function tries to connect to the provided IP address on port 50000. After 10 tries the function calls the setLaserStatus function
-
-  @param controllerIp the IP address of the controller to connect to
- */
-/*void connectToController(String controllerIp) {
-  char firstChar = controllerIp.charAt(0);
-  if (firstChar == 255 || controllerIp.length() == 0) {
-    setLaserStatus(laserStatus::NotConfigured);
-    return;
-  }
-
-  unsigned int attempts = 0;
-  while (!_client.connect(_server, 50000)) {  // keep trying to connect to controller
-    attempts++;
-    if (attempts > 10) {
-      setLaserStatus(laserStatus::ConnectionToControllerLost);
-      return;
-    }
-  }
-}*/
-
-/**
  @brief configures the build in Teensy watchdog to monitor for software hicups
 */
 void configureWatchdog() {
   WDT_timings_t config;
-  config.timeout = 5;  // in seconds, 0->128
+  config.timeout = 3;  // in seconds, 0->128
   _watchdog.begin(config);
 }
 
@@ -130,7 +91,20 @@ void initializeModes() {
 }
 
 bool emergencyButtonIsPressedOrDisconnected() {
-  return digitalRead(7) == 1;
+  const int measureAttemptsCount = 10;
+  const int countThreshold = 5;
+  int pressedOrDisconnectedCount = 0;
+
+  for (int i = 0; i < measureAttemptsCount; i++) {
+    if (digitalRead(7) == 1) {
+      pressedOrDisconnectedCount++;
+    }
+    if (pressedOrDisconnectedCount > measureAttemptsCount) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 void executeEmergencyButtonProtocol() {
@@ -216,7 +190,6 @@ void executeSelectedMode() {
 
 void setup() {
   configureWatchdog();
-  Serial.begin(9600);
   randomSeed(analogRead(0));
 
   _laser.init(_watchdog);
@@ -234,6 +207,8 @@ void setup() {
 
   initializeMenus();
   initializeModes();
+
+  _networkController.sendBroadcast();
 
   _menus[0]->displayMenu(_oledModule, _currentSelectedMenu, 0, false);  // render main menu on startup
 }

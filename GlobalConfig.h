@@ -25,6 +25,13 @@ extern const String RotatingPointsAnimationName;
     Network = 2,      // The laser is ready to receive and process commands that are received
   };
 
+  enum ConnectionStatus {
+    Connected = 0,
+    ConnectionPending = 1,
+    NotConnected = 2,
+  };
+
 extern LaserMode CurrentLaserMode;
+extern ConnectionStatus CurrentConnectionStatus;
 
 #endif

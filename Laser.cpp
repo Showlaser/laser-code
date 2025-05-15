@@ -68,9 +68,9 @@ void Laser::sendTo(int newXPos, int newYPos) {
   int differenceY = (int)(max(_yPos, yPos) - min(_yPos, yPos));
   int difference = max(differenceX, differenceY);
 
-  const float alpha = 0.03;  // Lower values provide more smoothing
+  const float alpha = 0.05;  // Lower values provide more smoothing
 
-  int steps = (int)(difference * 0.05);
+  int steps = (int)(difference * 0.04);
   for (int i = 0; i < steps; i++) {
     // Apply low-pass filter gradually to move toward target values
     int x = _xPos + alpha * (xPos - _xPos);
