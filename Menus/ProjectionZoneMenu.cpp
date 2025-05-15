@@ -1,6 +1,6 @@
 #include "ProjectionZoneMenu.h"
-#include "GlobalConfig.h"
-#include "Settings.h"
+#include "../GlobalConfig.h"
+#include "../Settings.h"
 
 void ProjectionZoneMenu::onUpdate(OledModule &oledModule, int &rotaryValue, int minValue, int maxValue, std::function<void()> callback) {
   if (rotaryValue < minValue) {

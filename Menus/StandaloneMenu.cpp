@@ -1,5 +1,5 @@
 #include "StandaloneMenu.h"
-#include "GlobalConfig.h"
+#include "../GlobalConfig.h"
 
 const String _startProjection = "Start projection";
 

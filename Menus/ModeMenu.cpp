@@ -1,5 +1,5 @@
 #include "ModeMenu.h"
-#include "GlobalConfig.h"
+#include "../GlobalConfig.h"
 
 void ModeMenu::displayMenu(OledModule &oledModule, String &currentSelectedMenu, int rotaryValue, bool buttonPressed) {
   const int menuItemsLength = 2;

@@ -1,17 +1,21 @@
-#ifndef PROJECTIONZONEMENU_H
-#define PROJECTIONZONEMENU_H
+#ifndef AUDIENCESHUTTERMENU_H
+#define AUDIENCESHUTTERMENU_H
 
 #include "Arduino.h"
-#include "IMenu.h"
-#include "OledModule.h"
-#include <functional>
+#include "../IMenu.h"
+#include "../OledModule.h"
+#include "../GlobalConfig.h"
+#include "../Settings.h"
+#include "../AudienceShutter.h"
 
-class ProjectionZoneMenu : public IMenu {
+class AudienceShutterMenu : public IMenu {
 public:
   void displayMenu(OledModule &oledModule, String &currentSelectedMenu, int rotaryValue, bool buttonPressed);
   String getMenuName();
 
 private:
+  int _previousRotaryValue;
+
   String _currentSelectedItemName;
 
   /**

@@ -5,16 +5,24 @@
 #include "OledModule.h"
 #include "StandaloneMode.h"
 #include "IMenu.h"
-#include "MainMenu.h"
-#include "ModeMenu.h"
-#include "StandaloneMenu.h"
 #include "SettingsMenu.h"
-#include "ProjectionZoneMenu.h"
 #include "AudienceShutter.h"
 #include "GlobalConfig.h"
 #include "IMode.h"
 #include "StandaloneMode.h"
-#include "AudienceShutterMenu.h"
+
+#include "Menus/AudienceShutterMenu.h"
+#include "Menus/AudienceShutterMenu.cpp"
+#include "Menus/MainMenu.h"
+#include "Menus/MainMenu.cpp"
+#include "Menus/ModeMenu.h"
+#include "Menus/ModeMenu.cpp"
+#include "Menus/ProjectionZoneMenu.h"
+#include "Menus/ProjectionZoneMenu.cpp"
+#include "Menus/StandaloneMenu.h"
+#include "Menus/StandaloneMenu.cpp"
+
+#include "NetworkController.h"
 
 WDT_T4<WDT1> _watchdog;
 Laser _laser;

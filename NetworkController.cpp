@@ -3,10 +3,13 @@
 #include <NativeEthernet.h>
 #include <NativeEthernetUdp.h>
 
+ConnectionStatus _connectionStatus = ConnectionStatus::NotConnected;
+
+// EthernetUDP library https://github.com/arduino-libraries/Ethernet/blob/master/src/EthernetUdp.cpp
 EthernetUDP _udpClient;
 EthernetServer _server;
 
-IPAddress _server;
+IPAddress _serverIP;
 IPAddress broadcastIP(192, 168, 1, 255); // Broadcast address
 
 unsigned int _udpPort = 8888;
@@ -34,15 +37,19 @@ void teensyMAC(uint8_t* mac) {
 void connectToController(String controllerIp) {
   char firstChar = controllerIp.charAt(0);
   if (firstChar == 255 || controllerIp.length() == 0) {
-    setLaserStatus(laserStatus::NotConfigured);
     return;
   }
 
+  EthernetClient client = _server.available();
+
   unsigned int attempts = 0;
-  while (!_client.connect(_server, _tcpPort)) {  // keep trying to connect to controller
+  while (!client.connect(_serverIP, _tcpPort)) {  // keep trying to connect to controller
+    _connectionStatus = ConnectionStatus::ConnectionPending;
+
     attempts++;
     if (attempts > 10) {
-      setLaserStatus(laserStatus::ConnectionToControllerLost);
+      _connectionStatus = ConnectionStatus::NotConnected;
+      client.stop();
       return;
     }
   }
@@ -58,15 +65,16 @@ void NetworkController::init() {
 }
 
 void NetworkController::sendBroadcast() {
-  if (!client.connected()) {
-    return;
-  }
-
-
+  _udpClient.beginPacket(IPAddress(255, 255, 255, 255), _udpPort);  // Broadcast
+  _udpClient.print("Teensy_Alive:192.168.1.100");  // Include IP
+  _udpClient.endPacket();
 }
 
 void NetworkController::disconnect() {
+  EthernetClient client = _server.available();
+  client.stop();
 }
 
 ConnectionStatus NetworkController::getConnectionStatus() {
+  return _connectionStatus;
 }
