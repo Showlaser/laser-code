@@ -1,8 +1,8 @@
 #ifndef IMODE_H
 #define IMODE_H
 
-#include "GlobalConfig.h"
-#include "Settings.h"
+#include "../GlobalConfig.h"
+#include "../Settings.h"
 
 class IMode {
 public:

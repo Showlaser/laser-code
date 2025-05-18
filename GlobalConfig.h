@@ -10,21 +10,18 @@ extern const String ControllerMenuName;
 extern const String SettingsMenuName;
 extern const String ProjectionZoneMenuName;
 extern const String ControllerIpMenuName;
-extern const String AudienceShutterMenuName;
+extern const String SDCardMenuName;
+extern const String PlaySDFileMenuName;
 extern const String ExitMenuName;
-
-extern const String RandomDotsAnimationName;
-extern const String LineAnimationName;
-extern const String CircleAnimationName;
-extern const String WideningLinesAnimationName;
-extern const String RotatingPointsAnimationName;
 
   enum LaserMode {
     NotSelected = 0,  // The showlaser will not go into a mode
     Standalone = 1,   // The showlaser is not connected to a controller and is working standalone
     Network = 2,      // The laser is ready to receive and process commands that are received
+    SDCardMode = 3,        // The laser is playing a file from the SD card
   };
 
 extern LaserMode CurrentLaserMode;
+extern String SelectedSDCardFile;
 
 #endif

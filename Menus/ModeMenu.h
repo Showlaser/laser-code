@@ -2,7 +2,7 @@
 #define MODEMENU_H
 
 #include "Arduino.h"
-#include "../IMenu.h"
+#include "IMenu.h"
 #include "../OledModule.h"
 
 class ModeMenu : public IMenu {

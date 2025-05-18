@@ -1,11 +1,11 @@
-#ifndef SETTINGSMENU_H
-#define SETTINGSMENU_H
+#ifndef SDCARDMENU_H
+#define SDCARDMENU_H
 
 #include "Arduino.h"
 #include "IMenu.h"
-#include "OledModule.h"
+#include "../OledModule.h"
 
-class SettingsMenu : public IMenu {
+class SDCardMenu : public IMenu {
 public:
   void displayMenu(OledModule &oledModule, String &currentSelectedMenu, int rotaryValue, bool buttonPressed);
   String getMenuName();

@@ -2,7 +2,7 @@
 #define MAINMENU_H
 
 #include "Arduino.h"
-#include "../IMenu.h"
+#include "IMenu.h"
 #include "../OledModule.h"
 
 class MainMenu : public IMenu {

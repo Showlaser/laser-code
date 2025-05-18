@@ -3,16 +3,16 @@
 #include <queue>
 #include "Settings.h"
 #include "OledModule.h"
-#include "StandaloneMode.h"
-#include "IMenu.h"
-#include "SettingsMenu.h"
-#include "AudienceShutter.h"
 #include "GlobalConfig.h"
-#include "IMode.h"
-#include "StandaloneMode.h"
+#include "NetworkController.h"
+#include "SDCard.h"
+#include <vector>
 
-#include "Menus/AudienceShutterMenu.h"
-#include "Menus/AudienceShutterMenu.cpp"
+#include "Modes/IMode.h"
+#include "Modes/PlaySDFileMode.h"
+#include "Modes/PlaySDFileMode.cpp"
+
+#include "Menus/IMenu.h"
 #include "Menus/MainMenu.h"
 #include "Menus/MainMenu.cpp"
 #include "Menus/ModeMenu.h"
@@ -21,9 +21,14 @@
 #include "Menus/ProjectionZoneMenu.cpp"
 #include "Menus/StandaloneMenu.h"
 #include "Menus/StandaloneMenu.cpp"
+#include "Menus/SettingsMenu.h"
+#include "Menus/SettingsMenu.cpp"
+#include "Menus/SDCardMenu.h"
+#include "Menus/SDCardMenu.cpp"
+#include "Menus/PlaySDFileMenu.h"
+#include "Menus/PlaySDFileMenu.cpp"
 
-#include "NetworkController.h"
-
+SDCard _sdCard;
 WDT_T4<WDT1> _watchdog;
 Laser _laser;
 OledModule _oledModule;
@@ -37,7 +42,7 @@ LaserMode _previousSelectedLaserMode = LaserMode::NotSelected;
 const int _menusLength = 6;
 IMenu* _menus[_menusLength];
 
-String _previousSelectedMenu = "";      
+String _previousSelectedMenu = "";
 String _currentSelectedMenu = MainMenuName;
 
 unsigned long _previousScreenUpdate = 0;
@@ -81,26 +86,25 @@ void setLaserStatus(laserStatus status) {
 */
 void configureWatchdog() {
   WDT_timings_t config;
-  config.timeout = 3;  // in seconds, 0->128
+  config.timeout = 1;  // in seconds, 0->128
   _watchdog.begin(config);
 }
 
 void initializeMenus() {
   _menus[0] = new MainMenu();
   _menus[1] = new ModeMenu();
-  _menus[2] = new StandaloneMenu();
-  _menus[3] = new SettingsMenu();
-  _menus[4] = new ProjectionZoneMenu();
-  _menus[5] = new AudienceShutterMenu();
+  _menus[2] = new SettingsMenu();
+  _menus[3] = new ProjectionZoneMenu();
+  _menus[4] = new SDCardMenu();
+  _menus[5] = new PlaySDFileMenu();
 }
 
 void initializeModes() {
-  _modes[0] = new StandaloneMode(_laser);
+  _modes[0] = new PlaySDFileMode(_laser);
 }
 
 bool emergencyButtonIsPressedOrDisconnected() {
   const int measureAttemptsCount = 10;
-  const int countThreshold = 5;
   int pressedOrDisconnectedCount = 0;
 
   for (int i = 0; i < measureAttemptsCount; i++) {
@@ -189,34 +193,62 @@ void executeSelectedMode() {
     }
 
     _modes[selectedModeId]->execute();
-    _previousSelectedLaserMode = CurrentLaserMode; 
+    _previousSelectedLaserMode = CurrentLaserMode;
   } else if (CurrentLaserMode == LaserMode::NotSelected && _previousSelectedLaserMode != LaserMode::NotSelected) {
     _laser.setLaserPower(0, 0, 0);
     _previousSelectedLaserMode = CurrentLaserMode;
   }
 }
 
-void setup() {
-  configureWatchdog();
-  randomSeed(analogRead(0));
-
+void initLaser() {
   _laser.init(_watchdog);
+  _oledModule.println(3, 15, "Init laser");
+  _oledModule.displayChanges();
 
+  _oledModule.println(3, 25, "Enable laser");
+  _oledModule.displayChanges();
+  _laser.sendTo(0, 0);
+  _laser.enableLasers();
+}
+
+void initSDCard() {
+  bool success = _sdCard.init();
+  _oledModule.println(3, 35, success ? "SD init successfull" : "SD init failed");
+  _oledModule.displayChanges();
+}
+
+void setup() {
+  Serial.begin(9600);
+  configureWatchdog();
   _oledModule.init();
+  initLaser();
   _watchdog.feed();
 
-  while (emergencyButtonIsPressedOrDisconnected()) {
+  if (emergencyButtonIsPressedOrDisconnected()) {
+    _oledModule.clearDisplay();
     _oledModule.println(3, 3, "Emergency button pressed or disconnected!");
     _oledModule.displayChanges();
-    _watchdog.feed();
+
+    while (true) {
+      _watchdog.feed();
+    }
   }
 
-  _laser.enableLasers();
-
+  initSDCard();
+  _sdCard.createJsonFile("{\"test\": \"[0]\"}", "test.json");
   initializeMenus();
   initializeModes();
 
-  _networkController.sendBroadcast();
+  //_networkController.sendBroadcast();
+
+  _oledModule.println(3, 45, "Laser init success!");
+  _oledModule.displayChanges();
+
+  const unsigned int millisToWait = 5000;
+  unsigned int startMillis = millis();
+  while (millis() < millisToWait + startMillis) {
+    _watchdog.feed();  // Allows the user to see the init results
+  }
 
   _menus[0]->displayMenu(_oledModule, _currentSelectedMenu, 0, false);  // render main menu on startup
 }
