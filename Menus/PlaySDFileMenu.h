@@ -1,6 +1,7 @@
 #ifndef PLAYSDFILEMENU_H
 #define PLAYSDFILEMENU_H
 
+#include <ArduinoJson.h>
 #include "Arduino.h"
 #include "IMenu.h"
 #include "../OledModule.h"

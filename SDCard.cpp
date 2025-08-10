@@ -10,29 +10,35 @@
 
 const int chipSelect = BUILTIN_SDCARD;
 
-SDCard::SDCard() {
+SDCard::SDCard()
+{
 }
 
-bool SDCard::init() {
+bool SDCard::init()
+{
   SPI.setMOSI(SD_MOSI);
   SPI.setSCK(SD_SCK);
   SPI.setMISO(SD_MISO);
   return SD.begin(chipSelect);
 }
 
-std::vector<String> SDCard::getJsonFiles() {
+std::vector<String> SDCard::getJsonFiles()
+{
   std::vector<String> items;
 
   File root = SD.open("/");
-  while (true) {
+  while (true)
+  {
     File entry = root.openNextFile();
 
-    if (!entry) {
+    if (!entry)
+    {
       entry.close();
-      break;  // no more files
+      break; // no more files
     }
 
-    if (!entry.isDirectory() && strstr(entry.name(), ".json")) {
+    if (!entry.isDirectory() && strstr(entry.name(), ".json"))
+    {
       items.push_back(entry.name());
     }
 
@@ -42,22 +48,27 @@ std::vector<String> SDCard::getJsonFiles() {
   return items;
 }
 
-String SDCard::readJsonFile(String fileName) {
-  if (!fileName.endsWith(".json")) {
+String SDCard::readJsonFile(String fileName)
+{
+  if (!fileName.endsWith(".json"))
+  {
     return "";
   }
 
   File jsonFile = SD.open(fileName.c_str());
-  if (!jsonFile) {
+  if (!jsonFile)
+  {
     return "";
   }
 
   String result;
-  while (jsonFile.available()) {
+  while (jsonFile.available())
+  {
     char c = jsonFile.read();
     result += c;
 
-    if (c == 0) {
+    if (c == 0)
+    {
       break;
     }
   }
@@ -66,13 +77,16 @@ String SDCard::readJsonFile(String fileName) {
   return result;
 }
 
-bool SDCard::createJsonFile(String json, String fileName) {
-  if (!fileName.endsWith(".json") || SD.exists(fileName.c_str())) {
+bool SDCard::createJsonFile(String json, String fileName)
+{
+  if (!fileName.endsWith(".json") || SD.exists(fileName.c_str()))
+  {
     return false;
   }
 
   File jsonFile = SD.open(fileName.c_str(), FILE_WRITE);
-  if (jsonFile) {
+  if (jsonFile)
+  {
     jsonFile.println(json);
     jsonFile.close();
     return true;
@@ -82,8 +96,10 @@ bool SDCard::createJsonFile(String json, String fileName) {
   return false;
 }
 
-bool SDCard::deleteJsonFile(String fileName) {
-  if (!SD.exists(fileName.c_str()) || !fileName.endsWith(".json")) {
+bool SDCard::deleteJsonFile(String fileName)
+{
+  if (!SD.exists(fileName.c_str()) || !fileName.endsWith(".json"))
+  {
     return false;
   }
 

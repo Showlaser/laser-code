@@ -3,7 +3,8 @@
 #include "../SDCard.h"
 #include <vector>
 
-void SDCardMenu::displayMenu(OledModule &oledModule, String &currentSelectedMenu, int rotaryValue, bool buttonPressed) {
+void SDCardMenu::displayMenu(OledModule &oledModule, String &currentSelectedMenu, int rotaryValue, bool buttonPressed)
+{
   SDCard sdCard;
   bool initSuccess = sdCard.init();
 
@@ -18,27 +19,32 @@ void SDCardMenu::displayMenu(OledModule &oledModule, String &currentSelectedMenu
 
   menuItems[menuItemsLength - 1] = ExitMenuName;
 
-  if (rotaryValue < menuItemsLength && rotaryValue >= 0) {
+  if (rotaryValue < menuItemsLength && rotaryValue >= 0)
+  {
     String itemToShowCursorAt = menuItems[rotaryValue];
     oledModule.displaySelectableMenuItems(menuItems, menuItemsLength, itemToShowCursorAt);
 
-    if (buttonPressed) {
-      Serial.println(String(itemToShowCursorAt));
-      if (itemToShowCursorAt == ExitMenuName) {
+    if (buttonPressed)
+    {
+      if (itemToShowCursorAt == ExitMenuName)
+      {
         currentSelectedMenu = MainMenuName;
         return;
       }
 
       currentSelectedMenu = PlaySDFileMenuName;
-      SelectedSDCardFile = itemToShowCursorAt;
+      SelectedSDCardFilename = itemToShowCursorAt;
     }
-  } else {
+  }
+  else
+  {
     oledModule.resetRotaryValue();
   }
 
   oledModule.displayChanges();
 }
 
-String SDCardMenu::getMenuName() {
+String SDCardMenu::getMenuName()
+{
   return SDCardMenuName;
 }

@@ -1,5 +1,6 @@
 #ifndef GLOBALCONFIG_H
 #define GLOBALCONFIG_H
+#include <ArduinoJson.h>
 
 #include "Arduino.h"
 
@@ -14,14 +15,16 @@ extern const String SDCardMenuName;
 extern const String PlaySDFileMenuName;
 extern const String ExitMenuName;
 
-  enum LaserMode {
-    NotSelected = 0,  // The showlaser will not go into a mode
-    Standalone = 1,   // The showlaser is not connected to a controller and is working standalone
-    Network = 2,      // The laser is ready to receive and process commands that are received
-    SDCardMode = 3,        // The laser is playing a file from the SD card
-  };
+enum LaserMode
+{
+  NotSelected = -1, // The showlaser will not go into a mode
+  SDCardMode = 0,   // The laser is playing a file from the SD card
+  Standalone = 1,   // The showlaser is not connected to a controller and is working standalone
+  Network = 2,      // The laser is ready to receive and process commands that are received
+};
 
 extern LaserMode CurrentLaserMode;
-extern String SelectedSDCardFile;
+extern String SelectedSDCardFilename;
+extern JsonDocument SelectedSDCardJson;
 
 #endif
