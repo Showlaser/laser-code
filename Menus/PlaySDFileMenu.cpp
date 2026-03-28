@@ -5,7 +5,7 @@
 void PlaySDFileMenu::displayMenu(OledModule &oledModule, String &currentSelectedMenu, int rotaryValue, bool buttonPressed)
 {
   SDCard sdCard;
-  bool initSuccess = sdCard.init();
+  sdCard.init();
 
   const int menuItemsLength = 3;
   String menuItems[menuItemsLength] = {"Play " + SelectedSDCardFilename, "Delete " + SelectedSDCardFilename, ExitMenuName};
@@ -41,7 +41,7 @@ void PlaySDFileMenu::displayMenu(OledModule &oledModule, String &currentSelected
         return;
       }
 
-      if ("Delete " + SelectedSDCardFilename)
+      if (itemToShowCursorAt == "Delete " + SelectedSDCardFilename)
       {
         sdCard.deleteJsonFile(SelectedSDCardFilename);
         SelectedSDCardFilename = "";

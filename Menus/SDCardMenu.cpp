@@ -6,7 +6,7 @@
 void SDCardMenu::displayMenu(OledModule &oledModule, String &currentSelectedMenu, int rotaryValue, bool buttonPressed)
 {
   SDCard sdCard;
-  bool initSuccess = sdCard.init();
+  sdCard.init();
 
   std::vector<String> menuItemsVector = sdCard.getJsonFiles();
   const int menuItemsLength = menuItemsVector.size() + 1;

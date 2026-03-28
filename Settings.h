@@ -4,8 +4,13 @@
 #include <Arduino.h>
 #include <EEPROM.h>
 
-struct settingsModel {
+struct settingsModel
+{
   byte controllerIp[4];
+  char uuid[36];
+  char laserName[25];
+  int modelType;
+  int connectionStatus;
   byte maxPowerPerlaserInPercentage;
   byte projectionTopInPercentage;
   byte projectionBottomInPercentage;
@@ -13,7 +18,8 @@ struct settingsModel {
   byte projectionRightInPercentage;
 };
 
-class Settings {
+class Settings
+{
 public:
   static void setSettings(settingsModel &settings);
   static void saveSettings();

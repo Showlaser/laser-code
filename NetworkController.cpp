@@ -1,6 +1,8 @@
 #include "NetworkController.h"
 #include "Arduino.h"
 #include <NativeEthernetUdp.h>
+#include "Settings.h"
+#include <ArduinoJson.h>
 
 ConnectionStatus _connectionStatus = ConnectionStatus::NotConnected;
 
@@ -36,14 +38,15 @@ void NetworkController::teensyMAC(uint8_t *mac)
 
   @param controllerIp the IP address of the controller to connect to
  */
-void NetworkController::connectToController(String controllerIp)
+void NetworkController::connectToController(byte controllerIp[4])
 {
-  char firstChar = controllerIp.charAt(0);
-  if (firstChar == 255 || controllerIp.length() == 0)
+  byte firstChar = controllerIp[0];
+  if (firstChar == 255)
   {
     return;
   }
 
+  _serverIP = IPAddress(controllerIp[0], controllerIp[1], controllerIp[2], controllerIp[3]);
   EthernetClient client = _server.available();
 
   unsigned int attempts = 0;
@@ -59,14 +62,44 @@ void NetworkController::connectToController(String controllerIp)
       return;
     }
   }
+
+  _connectionStatus = ConnectionStatus::Connected;
 }
 
 String NetworkController::ipToString(IPAddress ip)
 {
-  return String(ip[0]) + "." +
-         String(ip[1]) + "." +
-         String(ip[2]) + "." +
-         String(ip[3]);
+  return String(ip[0]) + "." + String(ip[1]) + "." + String(ip[2]) + "." + String(ip[3]);
+}
+
+bool NetworkController::sendNetworkRequest(const String &httpMethod, const String &endPoint, IPAddress &serverAddress, const String &json)
+{
+  _watchdog.feed();
+  Serial.println("Connection attempt to API");
+  EthernetClient clientPost;
+
+  const uint16_t serverPort = 5004;
+  if (clientPost.connect(serverAddress, serverPort))
+  {
+    _watchdog.feed();
+    Serial.println("Connected to API");
+
+    clientPost.println(httpMethod + " " + endPoint + " HTTP/1.1");
+    clientPost.print("Host: ");
+    clientPost.println(serverAddress);
+    clientPost.println("Content-Type: application/json");
+    clientPost.print("Content-Length: ");
+    clientPost.println(json.length());
+    clientPost.println("Connection: close");
+    clientPost.println();
+    clientPost.println(json);
+
+    return true;
+  }
+  else
+  {
+    Serial.println("Connection to API failed");
+    return false;
+  }
 }
 
 void NetworkController::init(WDT_T4<WDT1> &watchdog)
@@ -81,15 +114,50 @@ void NetworkController::init(WDT_T4<WDT1> &watchdog)
   _watchdog.feed();
 }
 
-void NetworkController::onAdoptionRequest(String json)
+void NetworkController::onAdoptionRequest(IPAddress &serverAddress, const String &json)
 {
-  Serial.println("ONAdopt");
+  sendNetworkRequest("POST", "/laserconnection/connect", serverAddress, json);
+
+  JsonDocument doc;
+  DeserializationError error = deserializeJson(doc, json);
+  if (error)
+  {
+    Serial.print("deserializeJson() failed: ");
+    Serial.println(error.c_str());
+    return;
+  }
+
+  settingsModel settings = Settings::getSettings();
+
+  strncpy(settings.uuid, doc["Uuid"] | "", sizeof(settings.uuid));
+  settings.uuid[sizeof(settings.uuid) - 1] = '\0';
+
+  strncpy(settings.laserName, doc["Name"] | "", sizeof(settings.laserName));
+  settings.laserName[sizeof(settings.laserName) - 1] = '\0';
+
+  settings.modelType = doc["ModelType"] | 0;
+  settings.connectionStatus = doc["Status"] | 0;
+
+  const char *ipStr = doc["IPAddress"] | "";
+  if (strlen(ipStr) > 0)
+  {
+    int ip[4];
+    if (sscanf(ipStr, "%d.%d.%d.%d", &ip[0], &ip[1], &ip[2], &ip[3]) == 4)
+    {
+      for (int i = 0; i < 4; i++)
+      {
+        settings.controllerIp[i] = (byte)ip[i];
+      }
+    }
+  }
+
+  Settings::setSettings(settings);
 }
 
-void NetworkController::onApiCall(String type, String endpoint, CallbackFunc cb)
+void NetworkController::onApiCall(String type, String endPoint, IPAddress serverAddress, CallbackFunc cb)
 {
   String json = "{ \"uuid\": \"96bb4468-6ccf-469e-a31b-e5b76d8d9950\" }";
-  cb(json);
+  cb(serverAddress, json);
 }
 
 void NetworkController::getRequestData(EthernetClient &client, String &httpMethod, String &endPoint, String &json)
@@ -129,7 +197,7 @@ void NetworkController::getRequestData(EthernetClient &client, String &httpMetho
     else
     {
       json += c;
-      if (json.length() >= contentLength)
+      if ((int)json.length() >= contentLength)
       {
         break;
       }
@@ -140,18 +208,20 @@ void NetworkController::getRequestData(EthernetClient &client, String &httpMetho
 std::vector<KeyValue> NetworkController::createDict()
 {
   return {
-      {"POST", "/adopt", [this](String json)
-       { onAdoptionRequest(json); }}};
+      {"POST", "/adopt", [this](IPAddress serverAddress, const String json)
+       {
+         onAdoptionRequest(serverAddress, json);
+       }}};
 }
 
-void NetworkController::executeCallback(const String &httpMethod, const String &endPoint, const String json)
+void NetworkController::executeCallback(const String &httpMethod, const String &endPoint, IPAddress serverAddress, const String json)
 {
   static auto dict = createDict();
   for (auto &entry : dict)
   {
     if (entry.httpMethod == httpMethod && entry.endPoint == endPoint)
     {
-      entry.cb(json);
+      entry.cb(serverAddress, json);
       return;
     }
   }
@@ -172,21 +242,7 @@ void NetworkController::listenToApiCalls()
 
     if (json.length() > 0)
     {
-      executeCallback(httpMethod, endPoint, json);
-
-      JsonDocument doc;
-      if (deserializeJson(doc, json) == DeserializationError::Ok)
-      {
-        const char *uuid = doc["Uuid"];
-        const char *name = doc["Name"];
-        const char *ip = doc["IPAddress"];
-
-        Serial.printf("Laser registered: %s (%s) @ %s\n", name, uuid, ip);
-      }
-      else
-      {
-        Serial.println("Invalid JSON");
-      }
+      executeCallback(httpMethod, endPoint, remoteIp, json);
     }
 
     client.println("HTTP/1.1 200 OK");

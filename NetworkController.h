@@ -12,7 +12,7 @@ enum ConnectionStatus
   NotConnected = 2,
 };
 
-using CallbackFunc = std::function<void(String)>;
+using CallbackFunc = std::function<void(IPAddress, String)>;
 struct KeyValue
 {
   String httpMethod;
@@ -26,18 +26,19 @@ public:
   void init(WDT_T4<WDT1> &watchdog);
   void sendBroadcast();
   void listenToApiCalls();
-  void NetworkController::disconnect();
+  void connectToController(byte controllerIp[4]);
+  void disconnect();
   ConnectionStatus getConnectionStatus();
 
 private:
   WDT_T4<WDT1> _watchdog;
   std::vector<KeyValue> createDict();
-  void executeCallback(const String &httpMethod, const String &endPoint, const String json);
-  void onAdoptionRequest(String json);
+  void executeCallback(const String &httpMethod, const String &endPoint, IPAddress serverAddress, const String json);
+  void onAdoptionRequest(IPAddress &serverAddress, const String &json);
+  bool sendNetworkRequest(const String &httpMethod, const String &endPoint, IPAddress &serverAddress, const String &json);
   String ipToString(IPAddress ip);
   void teensyMAC(uint8_t *mac);
-  void connectToController(String controllerIp);
-  void onApiCall(String type, String endpoint, CallbackFunc cb);
+  void onApiCall(String type, String endPoint, IPAddress serverAddress, CallbackFunc cb);
   void getRequestData(EthernetClient &client, String &httpMethod, String &endPoint, String &json);
 };
 

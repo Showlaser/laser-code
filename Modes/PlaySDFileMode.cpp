@@ -56,10 +56,13 @@ void PlaySDFileMode::playCluster(JsonObject cluster)
 
 void PlaySDFileMode::execute()
 {
-    if (SelectedSDCardFilename == "")
+    if (SelectedSDCardFilename == "" || SelectedSDCardJson.isNull())
     {
-        Serial.println("Empty filename");
-        return;
+        Serial.println("Empty filename or json");
+        {
+            Serial.println("Empty filename");
+            return;
+        }
     }
 
     bool executionShouldBeStarted = _firstExecutionStartedAtMillis == 4294967295;
@@ -69,7 +72,6 @@ void PlaySDFileMode::execute()
         _firstExecutionStartedAtMillis = millis();
     }
 
-    long kpps = SelectedSDCardJson["kpps"];
     long duration = SelectedSDCardJson["duration"];
     JsonArray laserCommands = SelectedSDCardJson["laserCommands"];
 
@@ -81,7 +83,7 @@ void PlaySDFileMode::execute()
         playCluster(clusterToPlay);
     }
 
-    if (millis() - _firstExecutionStartedAtMillis > duration)
+    if ((long)(millis() - _firstExecutionStartedAtMillis) > duration)
     {
         CurrentLaserMode = LaserMode::NotSelected;
         _firstExecutionStartedAtMillis = 4294967295;

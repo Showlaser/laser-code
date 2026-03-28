@@ -223,7 +223,7 @@ void executeSelectedMode()
     }
 
     _modes[selectedModeId]->execute();
-    _previousSelectedLaserMode = selectedModeId;
+    _previousSelectedLaserMode = (LaserMode)selectedModeId;
   }
   else if (CurrentLaserMode == LaserMode::NotSelected && _previousSelectedLaserMode != LaserMode::NotSelected)
   {
@@ -253,6 +253,34 @@ void initSDCard()
   _oledModule.displayChanges();
 }
 
+void initNetworkController()
+{
+  _networkController.init(_watchdog);
+
+  settingsModel settings = Settings::getSettings();
+  if (settings.controllerIp[0] != 0 || settings.controllerIp[1] != 0 || settings.controllerIp[2] != 0 || settings.controllerIp[3] != 0)
+  {
+    _networkController.connectToController(settings.controllerIp);
+    if (_networkController.getConnectionStatus() == ConnectionStatus::Connected)
+    {
+      _oledModule.println(3, 45, "Connected to controller");
+    }
+    else
+    {
+      _oledModule.println(3, 45, "Not connected to controller");
+    }
+
+    _oledModule.displayChanges();
+  }
+
+  _oledModule.println(3, 45, "Sending broadcast");
+  _oledModule.displayChanges();
+  _networkController.sendBroadcast();
+
+  _oledModule.println(3, 55, "Laser init success!");
+  _oledModule.displayChanges();
+}
+
 void setup()
 {
   Serial.begin(9600);
@@ -276,21 +304,17 @@ void setup()
   initSDCard();
   initializeMenus();
   initializeModes();
+  initNetworkController();
 
-  _networkController.init(_watchdog);
-  _networkController.sendBroadcast();
+  // const unsigned int millisToWait = 500;
+  // unsigned int startMillis = millis();
+  // while (millis() < millisToWait + startMillis)
+  //{
+  //   _watchdog.feed(); // Allows the user to see the init results
+  // }
 
-  _oledModule.println(3, 45, "Laser init success!");
-  _oledModule.displayChanges();
-
-  const unsigned int millisToWait = 1000;
-  unsigned int startMillis = millis();
-  while (millis() < millisToWait + startMillis)
-  {
-    _watchdog.feed(); // Allows the user to see the init results
-  }
-
-  _menus[0]->displayMenu(_oledModule, _currentSelectedMenu, 0, false); // render main menu on startup
+  _menus[0]
+      ->displayMenu(_oledModule, _currentSelectedMenu, 0, false); // render main menu on startup
 }
 
 void loop()
