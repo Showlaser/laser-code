@@ -7,8 +7,8 @@
 struct settingsModel
 {
   byte controllerIp[4];
-  char uuid[36];
-  char laserName[25];
+  char uuid[37]; // 36-char UUID + null terminator
+  char name[25];
   int modelType;
   int connectionStatus;
   byte maxPowerPerlaserInPercentage;
@@ -21,7 +21,8 @@ struct settingsModel
 class Settings
 {
 public:
-  static void setSettings(settingsModel &settings);
+  static bool settingsValid(settingsModel settings);
+  static bool setSettings(settingsModel &settings);
   static void saveSettings();
   static settingsModel getSettings();
 

@@ -1,13 +1,20 @@
 #include "ProjectionZoneMenu.h"
+#include <ArduinoJson.h>
+#include "../NetworkController.h"
 #include "../GlobalConfig.h"
 #include "../Settings.h"
 
-void ProjectionZoneMenu::onUpdate(OledModule &oledModule, int &rotaryValue, int minValue, int maxValue, std::function<void()> callback) {
-  if (rotaryValue < minValue) {
+extern NetworkController _networkController;
+
+void ProjectionZoneMenu::onUpdate(OledModule &oledModule, int &rotaryValue, int minValue, int maxValue, std::function<void()> callback)
+{
+  if (rotaryValue < minValue)
+  {
     oledModule.overWriteRotaryValue(minValue * 4);
     return;
   }
-  if (rotaryValue > maxValue) {
+  if (rotaryValue > maxValue)
+  {
     oledModule.overWriteRotaryValue(maxValue * 4);
     return;
   }
@@ -16,7 +23,8 @@ void ProjectionZoneMenu::onUpdate(OledModule &oledModule, int &rotaryValue, int 
   callback();
 }
 
-void ProjectionZoneMenu::displayMenu(OledModule &oledModule, String &currentSelectedMenu, int rotaryValue, bool buttonPressed) {
+void ProjectionZoneMenu::displayMenu(OledModule &oledModule, String &currentSelectedMenu, int rotaryValue, bool buttonPressed)
+{
   const int menuItemsLength = 6;
   settingsModel settings = Settings::getSettings();
   String _laserPower = "Power p laser: " + String(settings.maxPowerPerlaserInPercentage) + "%";
@@ -25,52 +33,77 @@ void ProjectionZoneMenu::displayMenu(OledModule &oledModule, String &currentSele
   String _projectionLeftInPercentage = "Left distance:" + String(settings.projectionLeftInPercentage) + "%";
   String _projectionRightInPercentage = "Right distance:" + String(settings.projectionRightInPercentage) + "%";
 
-  if (_currentSelectedItemName == "") {
-    if (rotaryValue >= menuItemsLength || rotaryValue < 0) {
+  if (_currentSelectedItemName == "")
+  {
+    if (rotaryValue >= menuItemsLength || rotaryValue < 0)
+    {
       oledModule.resetRotaryValue();
       return;
     }
   }
 
-  String menuItems[menuItemsLength] = { _laserPower, _projectionTopInPercentage, _projectionBottomInPercentage, _projectionLeftInPercentage, _projectionRightInPercentage, ExitMenuName };
+  String menuItems[menuItemsLength] = {_laserPower, _projectionTopInPercentage, _projectionBottomInPercentage, _projectionLeftInPercentage, _projectionRightInPercentage, ExitMenuName};
   String itemToShowCursorAt = _currentSelectedItemName;
-  if (_currentSelectedItemName == "") {
+  if (_currentSelectedItemName == "")
+  {
     itemToShowCursorAt = menuItems[rotaryValue];
   }
 
   oledModule.displaySelectableMenuItems(menuItems, menuItemsLength, itemToShowCursorAt);
 
-  if (buttonPressed) {
-    if (itemToShowCursorAt == ExitMenuName) {
+  if (buttonPressed)
+  {
+    if (itemToShowCursorAt == ExitMenuName)
+    {
       currentSelectedMenu = SettingsMenuName;
       _currentSelectedItemName = "";
       return;
     }
 
-    if (_currentSelectedItemName != itemToShowCursorAt) {
+    if (_currentSelectedItemName != itemToShowCursorAt)
+    {
       _currentSelectedItemName = itemToShowCursorAt;
 
-      if (_currentSelectedItemName == _laserPower) {
+      if (_currentSelectedItemName == _laserPower)
+      {
         oledModule.overWriteRotaryValue(settings.maxPowerPerlaserInPercentage * 4);
-      } else if (_currentSelectedItemName == _projectionTopInPercentage) {
+      }
+      else if (_currentSelectedItemName == _projectionTopInPercentage)
+      {
         oledModule.overWriteRotaryValue(settings.projectionTopInPercentage * 4);
-      } else if (_currentSelectedItemName == _projectionBottomInPercentage) {
+      }
+      else if (_currentSelectedItemName == _projectionBottomInPercentage)
+      {
         oledModule.overWriteRotaryValue(settings.projectionBottomInPercentage * 4);
-      } else if (_currentSelectedItemName == _projectionLeftInPercentage) {
+      }
+      else if (_currentSelectedItemName == _projectionLeftInPercentage)
+      {
         oledModule.overWriteRotaryValue(settings.projectionLeftInPercentage * 4);
-      } else if (_currentSelectedItemName == _projectionRightInPercentage) {
+      }
+      else if (_currentSelectedItemName == _projectionRightInPercentage)
+      {
         oledModule.overWriteRotaryValue(settings.projectionRightInPercentage * 4);
       }
-    } else {
+    }
+    else
+    {
       _currentSelectedItemName = "";
       Settings::saveSettings();
+      _networkController.sendSettingsToController(settings);
     }
   }
-  if (_currentSelectedItemName != "") {
-    if (_currentSelectedItemName == _laserPower) {
-      auto callbackFunction = [&]() {
+  if (_currentSelectedItemName != "")
+  {
+    if (_currentSelectedItemName == _laserPower)
+    {
+      auto callbackFunction = [&]()
+      {
         settings.maxPowerPerlaserInPercentage = (byte)rotaryValue;
-        Settings::setSettings(settings);
+        bool settingsStored = Settings::setSettings(settings);
+        if (!settingsStored)
+        {
+          Serial.println("Settings not stored");
+        }
 
         _currentSelectedItemName = "Power p laser: " + String(settings.maxPowerPerlaserInPercentage) + "%";
         _laserPower = _currentSelectedItemName;
@@ -80,10 +113,17 @@ void ProjectionZoneMenu::displayMenu(OledModule &oledModule, String &currentSele
       };
 
       onUpdate(oledModule, rotaryValue, 0, 100, callbackFunction);
-    } else if (_currentSelectedItemName == _projectionTopInPercentage) {
-      auto callbackFunction = [&]() {
+    }
+    else if (_currentSelectedItemName == _projectionTopInPercentage)
+    {
+      auto callbackFunction = [&]()
+      {
         settings.projectionTopInPercentage = (byte)rotaryValue;
-        Settings::setSettings(settings);
+        bool settingsStored = Settings::setSettings(settings);
+        if (!settingsStored)
+        {
+          Serial.println("Settings not stored");
+        }
 
         _currentSelectedItemName = "Top distance:" + String(settings.projectionTopInPercentage) + "%";
         _projectionTopInPercentage = _currentSelectedItemName;
@@ -93,11 +133,18 @@ void ProjectionZoneMenu::displayMenu(OledModule &oledModule, String &currentSele
       };
 
       onUpdate(oledModule, rotaryValue, 0, 100, callbackFunction);
-    } else if (_currentSelectedItemName == _projectionBottomInPercentage) {
-      auto callbackFunction = [&]() {
+    }
+    else if (_currentSelectedItemName == _projectionBottomInPercentage)
+    {
+      auto callbackFunction = [&]()
+      {
         settings.projectionBottomInPercentage = (byte)rotaryValue;
-        Settings::setSettings(settings);
-        
+        bool settingsStored = Settings::setSettings(settings);
+        if (!settingsStored)
+        {
+          Serial.println("Settings not stored");
+        }
+
         _currentSelectedItemName = "Bottom distance:" + String(settings.projectionBottomInPercentage) + "%";
         _projectionBottomInPercentage = _currentSelectedItemName;
 
@@ -106,23 +153,37 @@ void ProjectionZoneMenu::displayMenu(OledModule &oledModule, String &currentSele
       };
 
       onUpdate(oledModule, rotaryValue, 0, 100, callbackFunction);
-    } else if (_currentSelectedItemName == _projectionLeftInPercentage) {
-      auto callbackFunction = [&]() {
+    }
+    else if (_currentSelectedItemName == _projectionLeftInPercentage)
+    {
+      auto callbackFunction = [&]()
+      {
         settings.projectionLeftInPercentage = (byte)rotaryValue;
-        Settings::setSettings(settings);
+        bool settingsStored = Settings::setSettings(settings);
+        if (!settingsStored)
+        {
+          Serial.println("Settings not stored");
+        }
 
         _currentSelectedItemName = "Left distance:" + String(settings.projectionLeftInPercentage) + "%";
         _projectionLeftInPercentage = _currentSelectedItemName;
-        
+
         menuItems[3] = _projectionLeftInPercentage;
         oledModule.displaySelectableMenuItems(menuItems, menuItemsLength, itemToShowCursorAt);
       };
 
       onUpdate(oledModule, rotaryValue, 0, 100, callbackFunction);
-    } else if (_currentSelectedItemName == _projectionRightInPercentage) {
-        auto callbackFunction = [&]() {
+    }
+    else if (_currentSelectedItemName == _projectionRightInPercentage)
+    {
+      auto callbackFunction = [&]()
+      {
         settings.projectionRightInPercentage = (byte)rotaryValue;
-        Settings::setSettings(settings);
+        bool settingsStored = Settings::setSettings(settings);
+        if (!settingsStored)
+        {
+          Serial.println("Settings not stored");
+        }
 
         _currentSelectedItemName = "Right distance:" + String(settings.projectionRightInPercentage) + "%";
         _projectionRightInPercentage = _currentSelectedItemName;
@@ -132,12 +193,13 @@ void ProjectionZoneMenu::displayMenu(OledModule &oledModule, String &currentSele
       };
 
       onUpdate(oledModule, rotaryValue, 0, 100, callbackFunction);
-      }
+    }
   }
 
   oledModule.displayChanges();
 }
 
-String ProjectionZoneMenu::getMenuName() {
+String ProjectionZoneMenu::getMenuName()
+{
   return ProjectionZoneMenuName;
 }
