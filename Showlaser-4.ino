@@ -265,6 +265,23 @@ void initSDCard()
   _oledModule.displayChanges();
 }
 
+String connectionStatusToString(ConnectionStatus status)
+{
+  switch (status)
+  {
+  case ConnectionStatus::Connected:
+    return "Connected";
+  case ConnectionStatus::ConnectionPending:
+    return "ConnectionPending";
+  case ConnectionStatus::NotConnected:
+    return "NotConnected";
+  case ConnectionStatus::NoNetworkCableConnected:
+    return "NoNetworkCableConnected";
+  default:
+    return "Unknown";
+  }
+}
+
 void initNetworkController()
 {
   // Show feedback before init(): Ethernet.begin() can block for a few seconds
@@ -275,7 +292,7 @@ void initNetworkController()
   _oledModule.displayChanges();
 
   _networkController.init(_watchdog, _sdCard);
-  settingsModel settings = Settings::getSettings();
+  settingsModel settings = Settings::getSettaings();
   _oledModule.println(3, 20, "Saved Controller IP: " + String(settings.controllerIp[0]) + "." + String(settings.controllerIp[1]) + "." + String(settings.controllerIp[2]) + "." + String(settings.controllerIp[3]));
   _oledModule.displayChanges();
 
@@ -289,9 +306,8 @@ void initNetworkController()
   _networkController.sendBroadcast();
   if (settings.controllerIp[0] != 0 || settings.controllerIp[1] != 0 || settings.controllerIp[2] != 0 || settings.controllerIp[3] != 0)
   {
-    Serial.println("Connecting to controller");
     _networkController.connectToController(settings.controllerIp);
-    Serial.println("Connection status: " + _networkController.getConnectionStatus());
+    Serial.println("Connection status: " + connectionStatusToString(_networkController.getConnectionStatus()));
     if (_networkController.getConnectionStatus() == ConnectionStatus::Connected)
     {
       _oledModule.println(3, 25, "Connected to controller using IP: " + String(settings.controllerIp[0]) + "." + String(settings.controllerIp[1]) + "." + String(settings.controllerIp[2]) + "." + String(settings.controllerIp[3]));

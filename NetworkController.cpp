@@ -110,8 +110,8 @@ void NetworkController::connectToController(byte controllerIp[4])
   setDoc(doc, settings);
 
   String jsonString;
-  serializeJson(doc, jsonString);
 
+  serializeJson(doc, jsonString);
   _watchdog.feed();
 
   // The very first TCP connect after boot has to ARP-resolve the controller
@@ -131,7 +131,6 @@ void NetworkController::connectToController(byte controllerIp[4])
       _watchdog.feed();
     }
   }
-  Serial.println("Connection to controller: " + String(success));
 
   if (success)
   {
@@ -261,15 +260,26 @@ void NetworkController::init(WDT_T4<WDT1> &watchdog, SDCard &sdCard)
   byte mac[6];
   teensyMAC(mac);
 
-  // Bound the DHCP negotiation: Ethernet.begin() blocks while it waits for a
-  // lease and the default timeout is 60s, which is far above the 10s watchdog
-  // window and would reset the board mid-boot. 5s total / 2s per response keeps
-  // it well under the watchdog while still allowing a normal DHCP handshake.
-  Ethernet.begin(mac, 5000, 2000);
-  _udpClient.begin(_udpPort);
-  // Detect a missing network cable up front. linkStatus() reads the PHY link
-  // state; LinkOFF means no cable (or the other end is down), so we flag it and
-  // skip the rest of the network bring-up since there is nothing to talk to.
+  // NativeEthernet initialises the Teensy PHY inside Ethernet.begin(), so the
+  // link status is only meaningful after the first begin() call. begin() also
+  // resolves DHCP synchronously: if no lease is acquired within the timeout,
+  // localIP() stays 0.0.0.0. Just after boot (or right after the cable is
+  // plugged in) the link often needs a moment to negotiate, so the first
+  // attempt can fail while later ones succeed. Retry until we get a valid IP.
+  const int maxDhcpAttempts = 6;
+  for (int attempt = 1; attempt <= maxDhcpAttempts && Ethernet.localIP() == IPAddress(0, 0, 0, 0); attempt++)
+  {
+    Serial.println("Requesting IP via DHCP (attempt " + String(attempt) + ")");
+    _watchdog.feed();
+    Ethernet.begin(mac, 5000, 2000);
+    _watchdog.feed();
+
+    if (Ethernet.localIP() == IPAddress(0, 0, 0, 0))
+    {
+      delay(500);
+    }
+  }
+
   if (Ethernet.linkStatus() == LinkOFF)
   {
     Serial.println("No network cable connected");
@@ -278,6 +288,17 @@ void NetworkController::init(WDT_T4<WDT1> &watchdog, SDCard &sdCard)
     return;
   }
 
+  if (Ethernet.localIP() == IPAddress(0, 0, 0, 0))
+  {
+    Serial.println("DHCP failed, no IP assigned (link is up)");
+    _connectionStatus = ConnectionStatus::NoNetworkCableConnected;
+    _watchdog.feed();
+    return;
+  }
+
+  Serial.println("Got IP via DHCP: " + ipToString(Ethernet.localIP()));
+
+  _udpClient.begin(_udpPort);
   _server.begin();
   _watchdog.feed();
 }
@@ -712,6 +733,7 @@ void NetworkController::disconnect()
 
 String NetworkController::getAssignedIP()
 {
+  Serial.println(ipToString(Ethernet.localIP()));
   return ipToString(Ethernet.localIP());
 }
 

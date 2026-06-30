@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//d/Deze Pc/Documenten/Projecten/Laser projector/Versie 4/Software/**)",
+      "Bash(f=\"C:/Users/Vincent/AppData/Local/Arduino15/packages/teensy/hardware/avr/1.62.0/libraries/NativeEthernet/src/NativeEthernet.cpp\"; awk '/::socketConnect/{p=1} p{print NR\": \"$0} p&&/^}/{exit}' \"$f\" | head -40)",
+      "Read(//c/Users/Vincent/AppData/Local/Arduino15/packages/teensy/hardware/avr/1.62.0/libraries/NativeEthernet/src/**)",
+      "Bash(awk '/::connectPoll/{p=1} p{print NR\": \"$0} p&&/^}/{c++} p&&c>=1&&/^}/{exit}' C:/Users/Vincent/AppData/Local/Arduino15/packages/teensy/hardware/avr/1.62.0/libraries/NativeEthernet/src/NativeEthernetClient.cpp)"
+    ]
+  }
+}
