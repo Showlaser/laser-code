@@ -4,7 +4,21 @@
       "Read(//d/Deze Pc/Documenten/Projecten/Laser projector/Versie 4/Software/**)",
       "Bash(f=\"C:/Users/Vincent/AppData/Local/Arduino15/packages/teensy/hardware/avr/1.62.0/libraries/NativeEthernet/src/NativeEthernet.cpp\"; awk '/::socketConnect/{p=1} p{print NR\": \"$0} p&&/^}/{exit}' \"$f\" | head -40)",
       "Read(//c/Users/Vincent/AppData/Local/Arduino15/packages/teensy/hardware/avr/1.62.0/libraries/NativeEthernet/src/**)",
-      "Bash(awk '/::connectPoll/{p=1} p{print NR\": \"$0} p&&/^}/{c++} p&&c>=1&&/^}/{exit}' C:/Users/Vincent/AppData/Local/Arduino15/packages/teensy/hardware/avr/1.62.0/libraries/NativeEthernet/src/NativeEthernetClient.cpp)"
+      "Bash(awk '/::connectPoll/{p=1} p{print NR\": \"$0} p&&/^}/{c++} p&&c>=1&&/^}/{exit}' C:/Users/Vincent/AppData/Local/Arduino15/packages/teensy/hardware/avr/1.62.0/libraries/NativeEthernet/src/NativeEthernetClient.cpp)",
+      "Read(//c/Users/Vincent/Downloads/**)",
+      "Read(//d/Deze Pc/Documenten/Projecten/Laser projector/**)",
+      "PowerShell($v = dotnet --version 2>$null; if \\($?\\) { \"dotnet: $v\" } else { \"dotnet: not found\" })",
+      "PowerShell(dotnet build $p -c Debug --nologo -v q 2>&1)",
+      "PowerShell($p = \"d:\\\\Deze Pc\\\\Documenten\\\\Projecten\\\\Laser projector\\\\Versie 4\\\\Software\\\\Pc software\\\\LaserAPI\\\\LaserAPI\\\\LaserAPI.csproj\")",
+      "Read(//d/Deze Pc/Documenten/Projecten/Laser projector/Versie 4/Software/Pc software/LaserAPI/LaserAPI/Logic/**)",
+      "Read(//d/Deze Pc/Documenten/Projecten/Laser projector/Versie 4/Software/Pc software/LaserAPI/LaserAPITests/**)",
+      "Read(//d/Deze Pc/Documenten/Projecten/Laser projector/Versie 4/Software/Pc software/Laser-frontend/**)",
+      "Read(//d/Deze Pc/Documenten/Projecten/Laser projector/Versie 4/Software/Pc software/Laser-frontend/src/components/lasershow/lasershow-editor/lasershow-export/**)"
+    ],
+    "additionalDirectories": [
+      "d:\\Deze Pc\\Documenten\\Projecten\\Laser projector\\Versie 4\\Software\\Pc software\\LaserAPI\\LaserAPI\\Logic",
+      "d:\\Deze Pc\\Documenten\\Projecten\\Laser projector\\Versie 4\\Software\\Pc software\\LaserAPI\\LaserAPITests\\Tests\\Logic",
+      "d:\\Deze Pc\\Documenten\\Projecten\\Laser projector\\Versie 4\\Software\\Pc software\\Laser-frontend\\src\\components\\lasershow\\lasershow-editor\\lasershow-export"
     ]
   }
 }

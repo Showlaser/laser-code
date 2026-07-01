@@ -48,14 +48,15 @@ void Laser::init(WDT_T4<WDT1> &watchdog)
 }
 
 /**
-  @brief sends the galvos to the specified position using logistic growth
+  @brief Applies the projection-zone mapping to a logical (-4000..4000)
+         coordinate, clamping to range first. This is the same mapping
+         sendTo() uses, factored out so the realtime producer can map points
+         before queueing them (keeping the mapping single-sourced).
 */
-void Laser::sendTo(int newXPos, int newYPos)
+void Laser::projectionMap(int &x, int &y)
 {
-  _watchdog.feed();
-
-  int xPos = fixBoundary(newXPos, -4000, 4000);
-  int yPos = fixBoundary(newYPos, -4000, 4000);
+  x = fixBoundary(x, -4000, 4000);
+  y = fixBoundary(y, -4000, 4000);
 
   settingsModel settings = Settings::getSettings();
   int projectionTopInPx = map(settings.projectionTopInPercentage, 0, 100, -4000, 4000);
@@ -64,8 +65,38 @@ void Laser::sendTo(int newXPos, int newYPos)
   int projectionLeftInPx = map(settings.projectionLeftInPercentage, 0, 100, -4000, 4000);
   int projectionRightInPx = map(settings.projectionRightInPercentage, 0, 100, 4000, -4000);
 
-  xPos = map(xPos, -4000, 4000, projectionLeftInPx, projectionRightInPx);
-  yPos = map(yPos, -4000, 4000, projectionBottomInPx, projectionTopInPx);
+  x = map(x, -4000, 4000, projectionLeftInPx, projectionRightInPx);
+  y = map(y, -4000, 4000, projectionBottomInPx, projectionTopInPx);
+}
+
+/**
+  @brief Writes an already-projection-mapped logical coordinate straight to the
+         galvo DAC. Used by the realtime ISR: no smoothing loop, no settings
+         read, no watchdog feed -- just the minimal DAC update.
+*/
+void Laser::writeGalvoRaw(int x, int y)
+{
+  x = fixBoundary(x, -4000, 4000);
+  y = fixBoundary(y, -4000, 4000);
+
+  dac3.setVoltageA(mapXToVoltage(x));
+  dac3.setVoltageB(mapYToVoltage(y));
+  dac3.updateDAC();
+
+  _xPos = x;
+  _yPos = y;
+}
+
+/**
+  @brief sends the galvos to the specified position using logistic growth
+*/
+void Laser::sendTo(int newXPos, int newYPos)
+{
+  _watchdog.feed();
+
+  int xPos = newXPos;
+  int yPos = newYPos;
+  projectionMap(xPos, yPos);
 
   int differenceX = (int)(max(_xPos, xPos) - min(_xPos, xPos));
   int differenceY = (int)(max(_yPos, yPos) - min(_yPos, yPos));
@@ -80,18 +111,18 @@ void Laser::sendTo(int newXPos, int newYPos)
     int x = _xPos + alpha * (xPos - _xPos);
     int y = _yPos + alpha * (yPos - _yPos);
 
-    int xMappedToVoltage = map(x, -4000, 4000, 0, 4096);
+    int xMappedToVoltage = mapXToVoltage(x);
     dac3.setVoltageA(xMappedToVoltage);
 
-    int yMappedToVoltage = map(y, -4000, 4000, 0, 4096);
+    int yMappedToVoltage = mapYToVoltage(y);
     dac3.setVoltageB(yMappedToVoltage);
     dac3.updateDAC();
   }
 
-  int xMappedToVoltage = map(xPos, -4000, 4000, 0, 4096);
+  int xMappedToVoltage = mapXToVoltage(xPos);
   dac3.setVoltageA(xMappedToVoltage);
 
-  int yMappedToVoltage = map(yPos, -4000, 4000, 0, 4096);
+  int yMappedToVoltage = mapYToVoltage(yPos);
   dac3.setVoltageB(yMappedToVoltage);
   dac3.updateDAC();
 
@@ -124,6 +155,22 @@ int Laser::fixBoundary(int input, int min, int max)
 }
 
 /**
+  @brief Map a logical (-4000..4000) coordinate to its DAC voltage. Both galvo
+         axes are inverted relative to the show/frontend convention
+         (+x = right, +y = up): higher voltage deflects left/down. Inverting both
+         keeps the projection upright AND rotating the same way as the frontend.
+*/
+int Laser::mapXToVoltage(int x)
+{
+  return map(x, -4000, 4000, 4096, 0);
+}
+
+int Laser::mapYToVoltage(int y)
+{
+  return map(y, -4000, 4000, 4096, 0);
+}
+
+/**
  @brief This function sets the power of the laser by the provided values.
  @brief Values below 0 will be set to 0 and values above 100 will be set to 100
 
@@ -131,7 +178,7 @@ int Laser::fixBoundary(int input, int min, int max)
  @param green the power the green laser should output from 0 / 100
  @param blue the power the blue laser should output from 0 / 100
 */
-void Laser::setLaserPower(byte red, byte green, byte blue)
+void Laser::applyLaserPower(byte red, byte green, byte blue)
 {
   if (_laserOutputDisabled)
   {
@@ -158,7 +205,12 @@ void Laser::setLaserPower(byte red, byte green, byte blue)
 
   dac2.setVoltageA(map(b, 0, 100, 0, 2750));
   dac2.updateDAC();
-  delayMicroseconds(5);
+}
+
+void Laser::setLaserPower(byte red, byte green, byte blue)
+{
+  applyLaserPower(red, green, blue);
+  delayMicroseconds(5); // let the DACs settle so the points reach full power
 }
 
 /**

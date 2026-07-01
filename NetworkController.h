@@ -6,6 +6,7 @@
 #include <NativeEthernet.h>
 #include <functional>
 #include "SDCard.h"
+#include "Laser.h"
 
 enum ConnectionStatus
 {
@@ -30,15 +31,10 @@ class NetworkController
 {
 public:
   bool laserControllerAliveCheck();
-  void init(WDT_T4<WDT1> &watchdog, SDCard &sdCard);
+  void init(WDT_T4<WDT1> &watchdog, SDCard &sdCard, Laser &laser);
   void sendBroadcast();
   void listenToApiCalls();
   void connectToController(byte controllerIp[4]);
-  String onIncommingAliveCheck(IPAddress &serverAddress, const String &json);
-  String onSDCardFilesRequest(IPAddress &serverAddress, const String &json);
-  String onSDCardReadJsonFile(IPAddress &serverAddress, const String &json);
-  String onSDCardCreateJsonFile(IPAddress &serverAddress, const String &json);
-  String onSDCardDeleteJsonFile(IPAddress &serverAddress, const String &json);
   void disconnect();
   String getAssignedIP();
   ConnectionStatus getConnectionStatus();
@@ -48,12 +44,23 @@ public:
 private:
   WDT_T4<WDT1> _watchdog;
   SDCard _sdCard;
+  Laser _laser;
+  // Set by getRequestData while it streams a binary upload straight to SD;
+  // read back by onSDCardBinaryUpload to build the response.
+  bool _lastBinaryUploadSucceeded = false;
   std::vector<KeyValue> createDict();
   void setDoc(JsonDocument &doc, settingsModel &settings);
   String executeCallback(const String &httpMethod, const String &endPoint, IPAddress serverAddress, const String json);
   String onAdoptionRequest(IPAddress &serverAddress, const String &json);
   String onSettingsUpdate(IPAddress &serverAddress, const String &json);
   String onSettingsRequest(IPAddress &serverAddress, const String &json);
+  String onIncommingAliveCheck(IPAddress &serverAddress, const String &json);
+  String onSDCardFilesRequest(IPAddress &serverAddress, const String &json);
+  String onSDCardReadJsonFile(IPAddress &serverAddress, const String &json);
+  String onSDCardBinaryUpload(IPAddress &serverAddress, const String &json);
+  String onSDCardDeleteJsonFile(IPAddress &serverAddress, const String &json);
+  String onProjectPattern(IPAddress &serverAddress, const String &json);
+
   bool sendNetworkRequest(const String &httpMethod, const String &endPoint, IPAddress &serverAddress, const String &json);
   String ipToString(IPAddress ip);
   void teensyMAC(uint8_t *mac);

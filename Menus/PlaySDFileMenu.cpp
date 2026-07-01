@@ -4,8 +4,10 @@
 
 void PlaySDFileMenu::displayMenu(OledModule &oledModule, String &currentSelectedMenu, int rotaryValue, bool buttonPressed)
 {
+  // SD is already mounted at boot (initSDCard). Re-initialising here on every
+  // render would re-mount the card and could invalidate the file PlaySDFileMode
+  // is streaming during playback, so only the (stateless) wrapper is needed.
   SDCard sdCard;
-  sdCard.init();
 
   const int menuItemsLength = 3;
   String menuItems[menuItemsLength] = {"Play " + SelectedSDCardFilename, "Delete " + SelectedSDCardFilename, ExitMenuName};
@@ -27,16 +29,8 @@ void PlaySDFileMenu::displayMenu(OledModule &oledModule, String &currentSelected
       if (itemToShowCursorAt == "Play " + SelectedSDCardFilename)
       {
         Serial.println("Play");
-        String json = sdCard.readJsonFile(SelectedSDCardFilename);
-
-        JsonDocument doc;
-        DeserializationError error = deserializeJson(doc, json);
-        if (error)
-        {
-          return;
-        }
-
-        SelectedSDCardJson = doc;
+        // The show is streamed frame-by-frame from SD by PlaySDFileMode, so we
+        // no longer load the whole file into RAM here -- just select the mode.
         CurrentLaserMode = LaserMode::SDCardMode;
         return;
       }

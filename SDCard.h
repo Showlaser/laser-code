@@ -2,6 +2,7 @@
 #define SDCARD_H
 
 #include "Arduino.h"
+#include <SD.h>
 #include <vector>
 
 class SDCard {
@@ -39,6 +40,15 @@ public:
   @param fileName the name of the file to delete
   */
   bool deleteJsonFile(String fileName);
+
+  /**
+  @brief opens a file for writing, truncating any existing file with the same
+         name (unlike FILE_WRITE which appends). Used to stream an uploaded
+         binary show straight to disk without buffering it in RAM.
+  @param fileName the name of the file to (re)create
+  @returns the opened File; test it with `if (file)` for success
+  */
+  File openForWrite(const String &fileName);
 private:
 };
 

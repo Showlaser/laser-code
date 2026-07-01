@@ -37,7 +37,7 @@ std::vector<String> SDCard::getJsonFiles()
       break; // no more files
     }
 
-    if (!entry.isDirectory() && strstr(entry.name(), ".json"))
+    if (!entry.isDirectory() && (strstr(entry.name(), ".lzs") || strstr(entry.name(), ".json")))
     {
       items.push_back(entry.name());
     }
@@ -104,4 +104,15 @@ bool SDCard::deleteJsonFile(String fileName)
   }
 
   return SD.remove(fileName.c_str());
+}
+
+File SDCard::openForWrite(const String &fileName)
+{
+  // FILE_WRITE appends, so remove any existing file first to overwrite cleanly.
+  if (SD.exists(fileName.c_str()))
+  {
+    SD.remove(fileName.c_str());
+  }
+
+  return SD.open(fileName.c_str(), FILE_WRITE);
 }

@@ -6,6 +6,7 @@
 #include "GlobalConfig.h"
 #include "NetworkController.h"
 #include "SDCard.h"
+#include "RealtimePlayer.h"
 #include <vector>
 
 #include "Modes/IMode.h"
@@ -31,6 +32,7 @@
 SDCard _sdCard;
 WDT_T4<WDT1> _watchdog;
 Laser _laser;
+RealtimePlayer _player;
 OledModule _oledModule;
 NetworkController _networkController;
 
@@ -78,6 +80,8 @@ void setLaserStatus(laserStatus status)
 
   if (status == laserStatus::Defect)
   {
+    _player.stop(); // halt the realtime point clock before locking up
+    _laser.disableLasers();
     while (true)
     { // keep in a infinite loop so the laser is not reachable
     }
@@ -119,7 +123,7 @@ void initializeMenus()
 
 void initializeModes()
 {
-  _modes[0] = new PlaySDFileMode(_laser);
+  _modes[0] = new PlaySDFileMode(_laser, _player);
 }
 
 bool emergencyButtonIsPressedOrDisconnected()
@@ -147,6 +151,7 @@ void executeEmergencyButtonProtocol()
   if (emergencyButtonIsPressedOrDisconnected())
   {
     Serial.println("Emergency button pressed!");
+    _player.stop(); // halt the realtime point clock so no further DAC output
     _laser.disableLasers();
     _oledModule.clearDisplay();
     _oledModule.println(3, 3, "Emergency button pressed or disconnected! Restart required");
@@ -291,8 +296,8 @@ void initNetworkController()
   _oledModule.println(3, 5, "Connecting to network");
   _oledModule.displayChanges();
 
-  _networkController.init(_watchdog, _sdCard);
-  settingsModel settings = Settings::getSettaings();
+  _networkController.init(_watchdog, _sdCard, _laser);
+  settingsModel settings = Settings::getSettings();
   _oledModule.println(3, 20, "Saved Controller IP: " + String(settings.controllerIp[0]) + "." + String(settings.controllerIp[1]) + "." + String(settings.controllerIp[2]) + "." + String(settings.controllerIp[3]));
   _oledModule.displayChanges();
 
@@ -344,6 +349,7 @@ void setup()
   configureWatchdog();
   _oledModule.init();
   initLaser();
+  _player.begin(_laser);
   _watchdog.feed();
 
   if (emergencyButtonIsPressedOrDisconnected())

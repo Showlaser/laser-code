@@ -15,3 +15,4 @@ const String ExitMenuName = "Exit";
 LaserMode CurrentLaserMode = LaserMode::NotSelected;
 String SelectedSDCardFilename = "";
 JsonDocument SelectedSDCardJson;
+bool LoopSDCardPlayback = false;

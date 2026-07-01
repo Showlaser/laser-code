@@ -26,5 +26,6 @@ enum LaserMode
 extern LaserMode CurrentLaserMode;
 extern String SelectedSDCardFilename;
 extern JsonDocument SelectedSDCardJson;
+extern bool LoopSDCardPlayback; // when true, the SD/embedded show replays instead of ending
 
 #endif

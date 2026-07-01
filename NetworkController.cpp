@@ -253,7 +253,7 @@ bool NetworkController::sendNetworkRequest(const String &httpMethod, const Strin
   return statusCode >= 200 && statusCode < 300;
 }
 
-void NetworkController::init(WDT_T4<WDT1> &watchdog, SDCard &sdCard)
+void NetworkController::init(WDT_T4<WDT1> &watchdog, SDCard &sdCard, Laser &laser)
 {
   _watchdog = watchdog;
   _sdCard = sdCard;
@@ -296,7 +296,7 @@ void NetworkController::init(WDT_T4<WDT1> &watchdog, SDCard &sdCard)
     return;
   }
 
-  Serial.println("Got IP via DHCP: " + ipToString(Ethernet.localIP()));
+  Serial.println("Assigned DHCP IP: " + ipToString(Ethernet.localIP()));
 
   _udpClient.begin(_udpPort);
   _server.begin();
@@ -439,24 +439,14 @@ String NetworkController::onSDCardFilesRequest(IPAddress &serverAddress, const S
   return response;
 }
 
-String NetworkController::onSDCardCreateJsonFile(IPAddress &serverAddress, const String &json)
+
+String NetworkController::onSDCardBinaryUpload(IPAddress &serverAddress, const String &json)
 {
-  _watchdog.feed();
-
-  JsonDocument doc;
-  DeserializationError error = deserializeJson(doc, json);
-  if (error)
-  {
-    Serial.print("deserializeJson() failed: ");
-    Serial.println(error.c_str());
-    return "{\"success\":false,\"error\":\"invalid json\"}";
-  }
-
-  String filename = doc["filename"];
-  String fileJson = doc["json"];
-  bool success = _sdCard.createJsonFile(fileJson, filename);
-
-  return success ? "{\"success\":true}" : "{\"success\":false}";
+  // The body was already streamed to the SD card in getRequestData; report the
+  // outcome it recorded rather than touching the (unused) json body.
+  return _lastBinaryUploadSucceeded
+             ? "{\"success\":true}"
+             : "{\"success\":false}";
 }
 
 String NetworkController::onSDCardDeleteJsonFile(IPAddress &serverAddress, const String &json)
@@ -479,6 +469,26 @@ String NetworkController::onSDCardDeleteJsonFile(IPAddress &serverAddress, const
   return success
              ? "{\"success\":true}"
              : "{\"success\":false}";
+}
+
+String NetworkController::onProjectPattern(IPAddress &serverAddress, const String &json)
+{
+  _watchdog.feed();
+
+  JsonDocument doc;
+  DeserializationError error = deserializeJson(doc, json);
+  if (error)
+  {
+    Serial.print("deserializeJson() failed: ");
+    Serial.println(error.c_str());
+    return "{\"success\":false,\"error\":\"invalid json\"}";
+  }
+
+  String filename = doc["filename"];
+  String fileJson = doc["json"];
+  bool success = _sdCard.createJsonFile(fileJson, filename);
+
+  return success ? "{\"success\":true}" : "{\"success\":false}";
 }
 
 void NetworkController::onApiCall(String type, String endPoint, IPAddress serverAddress, CallbackFunc cb)
@@ -547,6 +557,71 @@ void NetworkController::getRequestData(EthernetClient &client, String &httpMetho
   if (clIdx >= 0)
   {
     contentLength = header.substring(clIdx + 15).toInt();
+  }
+
+  // --- Streaming binary upload: write the body straight to the SD card ---
+  // The .lzs show can be many KB; accumulating it in a String (like the JSON
+  // path below) is what caused the ArduinoJson NoMemory. Instead we stream it
+  // into a file through a small fixed buffer, so RAM use is O(buffer) not
+  // O(file). The target filename arrives in the X-Filename header; the API
+  // sends a fixed Content-Length (never chunked) for this endpoint.
+  if (httpMethod == "POST" && endPoint == "/sd-card-binary")
+  {
+    _lastBinaryUploadSucceeded = false;
+
+    String filename = "";
+    int nameIdx = lowerHeader.indexOf("x-filename:");
+    if (nameIdx >= 0)
+    {
+      int valueStart = nameIdx + 11; // strlen("x-filename:")
+      int lineEnd = header.indexOf("\r\n", valueStart);
+      if (lineEnd < 0)
+      {
+        lineEnd = header.length();
+      }
+      filename = header.substring(valueStart, lineEnd);
+      filename.trim();
+    }
+
+    if (chunked || filename.length() == 0 || contentLength <= 0)
+    {
+      return; // unsupported framing or missing target -> reported as failure
+    }
+
+    File out = _sdCard.openForWrite(filename);
+    if (!out)
+    {
+      return;
+    }
+
+    uint8_t buffer[512];
+    int bufferLength = 0;
+    int bytesWritten = 0;
+    for (int i = 0; i < contentLength; i++)
+    {
+      int b = readByte();
+      if (b < 0)
+      {
+        break; // client stalled or disconnected
+      }
+
+      buffer[bufferLength++] = (uint8_t)b;
+      if (bufferLength == (int)sizeof(buffer))
+      {
+        out.write(buffer, bufferLength);
+        bytesWritten += bufferLength;
+        bufferLength = 0;
+      }
+    }
+    if (bufferLength > 0)
+    {
+      out.write(buffer, bufferLength);
+      bytesWritten += bufferLength;
+    }
+    out.close();
+
+    _lastBinaryUploadSucceeded = (bytesWritten == contentLength);
+    return;
   }
 
   // --- Read the body ---
@@ -630,13 +705,17 @@ std::vector<KeyValue> NetworkController::createDict()
        {
          return onSDCardFilesRequest(serverAddress, json);
        }},
-      {"POST", "/sd-card", [this](IPAddress serverAddress, const String json)
-       {
-         return onSDCardCreateJsonFile(serverAddress, json);
-       }},
       {"PUT", "/sd-card", [this](IPAddress serverAddress, const String json)
        {
          return onSDCardDeleteJsonFile(serverAddress, json);
+       }},
+      {"POST", "/sd-card-binary", [this](IPAddress serverAddress, const String json)
+       {
+         return onSDCardBinaryUpload(serverAddress, json);
+       }},
+      {"POST", "/pattern", [this](IPAddress serverAddress, const String json)
+       {
+         return onProjectPattern(serverAddress, json);
        }},
   };
 }
