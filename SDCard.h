@@ -29,13 +29,6 @@ public:
   String readJsonFile(String fileName);
 
   /**
-  @brief write the json string to the SD card
-  @param json the json string to save on the SD card
-  @param fileName the name of the file to create
-  */
-  bool createJsonFile(String json, String fileName);
-
-  /**
   @brief delete the json file from the SD card
   @param fileName the name of the file to delete
   */

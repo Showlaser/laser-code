@@ -77,25 +77,6 @@ String SDCard::readJsonFile(String fileName)
   return result;
 }
 
-bool SDCard::createJsonFile(String json, String fileName)
-{
-  if (!fileName.endsWith(".json") || SD.exists(fileName.c_str()))
-  {
-    return false;
-  }
-
-  File jsonFile = SD.open(fileName.c_str(), FILE_WRITE);
-  if (jsonFile)
-  {
-    jsonFile.println(json);
-    jsonFile.close();
-    return true;
-  }
-
-  jsonFile.close();
-  return false;
-}
-
 bool SDCard::deleteJsonFile(String fileName)
 {
   if (!SD.exists(fileName.c_str()) || !fileName.endsWith(".json"))

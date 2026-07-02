@@ -5,8 +5,9 @@
 
 void SDCardMenu::displayMenu(OledModule &oledModule, String &currentSelectedMenu, int rotaryValue, bool buttonPressed)
 {
+  // The SD card is mounted once at boot; re-initialising it here (every OLED
+  // render) could invalidate a show stream that is playing from it.
   SDCard sdCard;
-  sdCard.init();
 
   std::vector<String> menuItemsVector = sdCard.getJsonFiles();
   const int menuItemsLength = menuItemsVector.size() + 1;

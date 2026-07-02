@@ -35,9 +35,12 @@ protected:
   Laser &_laser;
   RealtimePlayer &_player;
 
-  // Conservative bench rate. Galvo max scan rate is only reached at small
-  // angles; we start low and measure before pushing toward kpps (40000).
+  // Point clock for the current show: the .lzs kpps clamped to the allowed
+  // range (set when a show starts; this value is only the fallback default).
   uint32_t _baseClockHz = 20000;
+  // Corner hold in base-clock ticks, derived from CORNER_DWELL_US for the
+  // current show's point rate when it starts.
+  uint16_t _cornerDwellTicks = 4;
   bool _loop = false; // when true, the show replays from the start instead of ending
 
   // --- Subclass hooks ---

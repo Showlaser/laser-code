@@ -9,12 +9,19 @@ static const int MAX_STEP = 80;
 // rather than one point at a time.
 static const uint16_t REFILL_BATCH = 64;
 
-// Base-clock ticks to hold the beam at each path vertex (corner). A galvo cannot
-// turn a sharp corner instantly; without a brief pause it "cuts the corner" and
-// the shape rounds/bows. Holding a few ticks lets the mirrors settle on the
-// commanded position before the next edge, sharpening corners. Tunable; ~4 ticks
-// at 20 kHz is 200 us.
-static const uint16_t CORNER_DWELL = 4;
+// Time to hold the beam at each path vertex (corner). A galvo cannot turn a
+// sharp corner instantly; without a brief pause it "cuts the corner" and the
+// shape rounds/bows. The hold is specified in TIME and converted to base-clock
+// ticks per show, so corners settle equally long at every point rate.
+static const uint32_t CORNER_DWELL_US = 200;
+
+// Allowed range for the point clock. A show's exported kpps is honored within
+// this range. 40k matches the exporter's default galvo speed; the galvos only
+// truly track that rate at small deflection angles -- large full-field moves
+// lag and soften, which is scanner physics, not a bug. The minimum guards
+// against absurdly slow clocks from a malformed file.
+static const uint32_t MAX_BASE_CLOCK_HZ = 40000;
+static const uint32_t MIN_BASE_CLOCK_HZ = 1000;
 
 ShowPlayerMode::ShowPlayerMode(Laser &laser, RealtimePlayer &player)
     : _laser(laser), _player(player)
@@ -68,7 +75,7 @@ void ShowPlayerMode::appendSegment(int x0, int y0, int x1, int y1, byte r, byte 
     // The last emitted point of a segment lands exactly on the target vertex
     // (a corner); hold it so the galvo settles before the next edge. Interior
     // interpolation points move on immediately.
-    p.dwell = (i == steps) ? CORNER_DWELL : 1;
+    p.dwell = (i == steps) ? _cornerDwellTicks : 1;
     _lap.push_back(p);
   }
 }
@@ -127,6 +134,28 @@ void ShowPlayerMode::buildLapFromCurrentFrame()
   _lastX = curX;
   _lastY = curY;
 
+  if (_lap.empty())
+  {
+    // A frame with nothing to draw still occupies its duration: hold the beam
+    // blanked at the current position. This keeps gaps in a show (blink
+    // effects) at their real length instead of being skipped, and guarantees
+    // every frame pushes at least one point -- a looping show whose frames were
+    // all empty previously spun in the refill loop forever and starved the
+    // watchdog.
+    int holdX = curX;
+    int holdY = curY;
+    _laser.projectionMap(holdX, holdY);
+
+    OutPoint hold;
+    hold.x = (int16_t)holdX;
+    hold.y = (int16_t)holdY;
+    hold.r = 0;
+    hold.g = 0;
+    hold.b = 0;
+    hold.dwell = 1;
+    _lap.push_back(hold);
+  }
+
   // Total base-clock ticks one full pass of this lap occupies (points may dwell
   // more than one tick at corners), used to budget how many times the lap fits
   // in the frame's time.
@@ -150,6 +179,21 @@ void ShowPlayerMode::execute()
       return; // nothing to play yet
     }
     _started = true;
+
+    // Honor the show's exported galvo speed (kpps), clamped to the safe range.
+    // A missing/zero kpps (old file) falls back to the maximum, matching the
+    // previous fixed-rate behavior.
+    uint32_t kpps = _source->kpps();
+    if (kpps == 0)
+    {
+      kpps = MAX_BASE_CLOCK_HZ;
+    }
+    _baseClockHz = constrain(kpps, MIN_BASE_CLOCK_HZ, MAX_BASE_CLOCK_HZ);
+
+    // Corner hold converted to ticks at this show's point rate, at least 1.
+    uint32_t cornerTicks = (CORNER_DWELL_US * _baseClockHz) / 1000000UL;
+    _cornerDwellTicks = (cornerTicks > 0) ? (uint16_t)cornerTicks : 1;
+
     _player.start(_baseClockHz);
   }
 
@@ -185,12 +229,6 @@ void ShowPlayerMode::execute()
       _ticksLeftInCluster = ms * (long)_baseClockHz / 1000L;
       _lapIndex = 0;
       _needNewFrame = false;
-
-      if (_lap.empty())
-      {
-        _needNewFrame = true; // nothing to draw this frame; advance
-        continue;
-      }
     }
 
     const OutPoint &point = _lap[_lapIndex];

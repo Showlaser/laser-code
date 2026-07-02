@@ -62,7 +62,6 @@ private:
   String onPlaySDCardFile(IPAddress &serverAddress, const String &json);
   String onStopPlayback(IPAddress &serverAddress, const String &json);
   String onSDCardDeleteJsonFile(IPAddress &serverAddress, const String &json);
-  String onProjectPattern(IPAddress &serverAddress, const String &json);
 
   bool sendNetworkRequest(const String &httpMethod, const String &endPoint, IPAddress &serverAddress, const String &json);
   String ipToString(IPAddress ip);

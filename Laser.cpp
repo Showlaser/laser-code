@@ -193,10 +193,13 @@ void Laser::applyLaserPower(byte red, byte green, byte blue)
   settingsModel settings = Settings::getSettings();
   if (currentMaxPowerRgbPercentage > (settings.maxPowerPerlaserInPercentage * 3))
   {
-    // limit the laser power
-    r = settings.maxPowerPerlaserInPercentage * (r / 100);
-    g = settings.maxPowerPerlaserInPercentage * (g / 100);
-    b = settings.maxPowerPerlaserInPercentage * (b / 100);
+    // Limit the laser power: scale each channel onto the 0..maxPower range.
+    // Multiply BEFORE dividing -- (r / 100) in integer math is 0 for any value
+    // below 100, which blacked out limited channels instead of dimming them.
+    // The result never exceeds maxPowerPerlaserInPercentage per channel.
+    r = settings.maxPowerPerlaserInPercentage * r / 100;
+    g = settings.maxPowerPerlaserInPercentage * g / 100;
+    b = settings.maxPowerPerlaserInPercentage * b / 100;
   }
 
   dac1.setVoltageA(map(r, 0, 100, 0, 3500));

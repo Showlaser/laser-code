@@ -43,7 +43,11 @@ NetworkController _networkController;
 const int _modesLength = 2;
 IMode *_modes[_modesLength];
 
-LaserMode _previousSelectedLaserMode = LaserMode::NotSelected;
+// Index into _modes of the mode that ran last iteration, or -1 when none was
+// running. This is an ARRAY INDEX, not a LaserMode value: a mode's position in
+// _modes is unrelated to its enum value (NetworkPlayMode is _modes[1] but
+// reports LaserMode::Network == 2).
+int _previousModeId = -1;
 
 const int _menusLength = 6;
 IMenu *_menus[_menusLength];
@@ -238,29 +242,34 @@ void executeSelectedMode()
     int selectedModeId = getSelectedModeId();
     if (selectedModeId == -1)
     {
+      // A mode with no backing object (e.g. Standalone): make sure whatever ran
+      // before is fully stopped -- point clock halted, sources released --
+      // instead of lingering while we blank.
+      if (_previousModeId != -1)
+      {
+        _modes[_previousModeId]->stop();
+        _previousModeId = -1;
+      }
       _laser.setLaserPower(0, 0, 0);
       return;
     }
 
     // Switched directly from one active mode to another (e.g. a live upload
     // preempts an SD show): stop the previous one so it releases its source and
-    // resets, rather than resuming stale state later. _previousSelectedLaserMode
-    // holds the previous mode's array index.
-    if (_previousSelectedLaserMode != LaserMode::NotSelected &&
-        (int)_previousSelectedLaserMode != selectedModeId)
+    // resets, rather than resuming stale state later.
+    if (_previousModeId != -1 && _previousModeId != selectedModeId)
     {
-      _modes[_previousSelectedLaserMode]->stop();
+      _modes[_previousModeId]->stop();
     }
 
     _modes[selectedModeId]->execute();
-    _previousSelectedLaserMode = (LaserMode)selectedModeId;
+    _previousModeId = selectedModeId;
   }
-  else if (CurrentLaserMode == LaserMode::NotSelected && _previousSelectedLaserMode != LaserMode::NotSelected)
+  else if (_previousModeId != -1)
   {
     _laser.setLaserPower(0, 0, 0);
-    _modes[_previousSelectedLaserMode]
-        ->stop();
-    _previousSelectedLaserMode = LaserMode::NotSelected;
+    _modes[_previousModeId]->stop();
+    _previousModeId = -1;
   }
 }
 

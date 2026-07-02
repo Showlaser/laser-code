@@ -33,10 +33,10 @@ ShowSource *NetworkPlayMode::acquireSource()
   if (!_mem.load(std::move(LiveShowData)))
   {
     Serial.println("Live show: invalid .lzs blob");
+    CurrentLaserMode = LaserMode::NotSelected; // nothing to play; leave the mode
     return nullptr;
   }
 
-  _loop = true;
   return &_mem;
 }
 

@@ -527,26 +527,6 @@ String NetworkController::onSDCardDeleteJsonFile(IPAddress &serverAddress, const
              : "{\"success\":false}";
 }
 
-String NetworkController::onProjectPattern(IPAddress &serverAddress, const String &json)
-{
-  _watchdog.feed();
-
-  JsonDocument doc;
-  DeserializationError error = deserializeJson(doc, json);
-  if (error)
-  {
-    Serial.print("deserializeJson() failed: ");
-    Serial.println(error.c_str());
-    return "{\"success\":false,\"error\":\"invalid json\"}";
-  }
-
-  String filename = doc["filename"];
-  String fileJson = doc["json"];
-  bool success = _sdCard.createJsonFile(fileJson, filename);
-
-  return success ? "{\"success\":true}" : "{\"success\":false}";
-}
-
 void NetworkController::onApiCall(String type, String endPoint, IPAddress serverAddress, CallbackFunc cb)
 {
   String json = "";
@@ -639,9 +619,16 @@ void NetworkController::getRequestData(EthernetClient &client, String &httpMetho
       filename.trim();
     }
 
-    if (chunked || filename.length() == 0 || contentLength <= 0)
+    // Only bare filenames are accepted: no path separators or "..", so an
+    // uploaded name can never point outside the SD card root.
+    bool filenameSafe = filename.length() > 0 &&
+                        filename.indexOf('/') < 0 &&
+                        filename.indexOf('\\') < 0 &&
+                        filename.indexOf("..") < 0;
+
+    if (chunked || !filenameSafe || contentLength <= 0)
     {
-      return; // unsupported framing or missing target -> reported as failure
+      return; // unsupported framing or bad target -> reported as failure
     }
 
     File out = _sdCard.openForWrite(filename);
@@ -824,10 +811,6 @@ std::vector<KeyValue> NetworkController::createDict()
       {"POST", "/stop", [this](IPAddress serverAddress, const String json)
        {
          return onStopPlayback(serverAddress, json);
-       }},
-      {"POST", "/pattern", [this](IPAddress serverAddress, const String json)
-       {
-         return onProjectPattern(serverAddress, json);
        }},
   };
 }
