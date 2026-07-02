@@ -2,11 +2,12 @@
 #include <MCP48xx.h>
 
 // Define the MCP4822 instances and their respective CS pins
-MCP4822 dac1(9);   // CS pin for DAC1
-MCP4822 dac2(10);  // CS pin for DAC2
-MCP4822 dac3(12);  // CS pin for DAC3
+MCP4822 dac1(9);  // CS pin for DAC1
+MCP4822 dac2(10); // CS pin for DAC2
+MCP4822 dac3(12); // CS pin for DAC3
 
-void Laser::configureDacs() {
+void Laser::configureDacs()
+{
   dac1.init();
   dac2.init();
   dac3.init();
@@ -40,19 +41,22 @@ void Laser::configureDacs() {
   dac3.updateDAC();
 }
 
-void Laser::init(WDT_T4<WDT1> &watchdog) {
+void Laser::init(WDT_T4<WDT1> &watchdog)
+{
   _watchdog = watchdog;
   configureDacs();
 }
 
 /**
-  @brief sends the galvos to the specified position using logistic growth 
+  @brief Applies the projection-zone mapping to a logical (-4000..4000)
+         coordinate, clamping to range first. This is the same mapping
+         sendTo() uses, factored out so the realtime producer can map points
+         before queueing them (keeping the mapping single-sourced).
 */
-void Laser::sendTo(int newXPos, int newYPos) {
-  _watchdog.feed();
-
-  int xPos = fixBoundary(newXPos, -4000, 4000);
-  int yPos = fixBoundary(newYPos, -4000, 4000);
+void Laser::projectionMap(int &x, int &y)
+{
+  x = fixBoundary(x, -4000, 4000);
+  y = fixBoundary(y, -4000, 4000);
 
   settingsModel settings = Settings::getSettings();
   int projectionTopInPx = map(settings.projectionTopInPercentage, 0, 100, -4000, 4000);
@@ -61,33 +65,64 @@ void Laser::sendTo(int newXPos, int newYPos) {
   int projectionLeftInPx = map(settings.projectionLeftInPercentage, 0, 100, -4000, 4000);
   int projectionRightInPx = map(settings.projectionRightInPercentage, 0, 100, 4000, -4000);
 
-  xPos = map(xPos, -4000, 4000, projectionLeftInPx, projectionRightInPx);
-  yPos = map(yPos, -4000, 4000, projectionBottomInPx, projectionTopInPx);
+  x = map(x, -4000, 4000, projectionLeftInPx, projectionRightInPx);
+  y = map(y, -4000, 4000, projectionBottomInPx, projectionTopInPx);
+}
+
+/**
+  @brief Writes an already-projection-mapped logical coordinate straight to the
+         galvo DAC. Used by the realtime ISR: no smoothing loop, no settings
+         read, no watchdog feed -- just the minimal DAC update.
+*/
+void Laser::writeGalvoRaw(int x, int y)
+{
+  x = fixBoundary(x, -4000, 4000);
+  y = fixBoundary(y, -4000, 4000);
+
+  dac3.setVoltageA(mapXToVoltage(x));
+  dac3.setVoltageB(mapYToVoltage(y));
+  dac3.updateDAC();
+
+  _xPos = x;
+  _yPos = y;
+}
+
+/**
+  @brief sends the galvos to the specified position using logistic growth
+*/
+void Laser::sendTo(int newXPos, int newYPos)
+{
+  _watchdog.feed();
+
+  int xPos = newXPos;
+  int yPos = newYPos;
+  projectionMap(xPos, yPos);
 
   int differenceX = (int)(max(_xPos, xPos) - min(_xPos, xPos));
   int differenceY = (int)(max(_yPos, yPos) - min(_yPos, yPos));
   int difference = max(differenceX, differenceY);
 
-  const float alpha = 0.05;  // Lower values provide more smoothing
+  const float alpha = 0.05; // Lower values provide more smoothing
 
   int steps = (int)(difference * 0.04);
-  for (int i = 0; i < steps; i++) {
+  for (int i = 0; i < steps; i++)
+  {
     // Apply low-pass filter gradually to move toward target values
     int x = _xPos + alpha * (xPos - _xPos);
     int y = _yPos + alpha * (yPos - _yPos);
 
-    int xMappedToVoltage = map(x, -4000, 4000, 0, 4096);
+    int xMappedToVoltage = mapXToVoltage(x);
     dac3.setVoltageA(xMappedToVoltage);
 
-    int yMappedToVoltage = map(y, -4000, 4000, 0, 4096);
+    int yMappedToVoltage = mapYToVoltage(y);
     dac3.setVoltageB(yMappedToVoltage);
     dac3.updateDAC();
   }
 
-  int xMappedToVoltage = map(xPos, -4000, 4000, 0, 4096);
+  int xMappedToVoltage = mapXToVoltage(xPos);
   dac3.setVoltageA(xMappedToVoltage);
 
-  int yMappedToVoltage = map(yPos, -4000, 4000, 0, 4096);
+  int yMappedToVoltage = mapYToVoltage(yPos);
   dac3.setVoltageB(yMappedToVoltage);
   dac3.updateDAC();
 
@@ -106,14 +141,33 @@ void Laser::sendTo(int newXPos, int newYPos) {
 
    @return int the value between or equal to the min or max value
 */
-int Laser::fixBoundary(int input, int min, int max) {
-  if (input < min) {
+int Laser::fixBoundary(int input, int min, int max)
+{
+  if (input < min)
+  {
     return min;
   }
-  if (input > max) {
+  if (input > max)
+  {
     return max;
   }
   return input;
+}
+
+/**
+  @brief Map a logical (-4000..4000) coordinate to its DAC voltage. Both galvo
+         axes are inverted relative to the show/frontend convention
+         (+x = right, +y = up): higher voltage deflects left/down. Inverting both
+         keeps the projection upright AND rotating the same way as the frontend.
+*/
+int Laser::mapXToVoltage(int x)
+{
+  return map(x, -4000, 4000, 4096, 0);
+}
+
+int Laser::mapYToVoltage(int y)
+{
+  return map(y, -4000, 4000, 4096, 0);
 }
 
 /**
@@ -124,8 +178,10 @@ int Laser::fixBoundary(int input, int min, int max) {
  @param green the power the green laser should output from 0 / 100
  @param blue the power the blue laser should output from 0 / 100
 */
-void Laser::setLaserPower(byte red, byte green, byte blue) {
-  if (_laserOutputDisabled) {
+void Laser::applyLaserPower(byte red, byte green, byte blue)
+{
+  if (_laserOutputDisabled)
+  {
     return;
   }
 
@@ -135,11 +191,15 @@ void Laser::setLaserPower(byte red, byte green, byte blue) {
 
   int currentMaxPowerRgbPercentage = r + g + b;
   settingsModel settings = Settings::getSettings();
-  if (currentMaxPowerRgbPercentage > (settings.maxPowerPerlaserInPercentage * 3)) {
-    // limit the laser power
-    r = settings.maxPowerPerlaserInPercentage * (r / 100);
-    g = settings.maxPowerPerlaserInPercentage * (r / 100);
-    b = settings.maxPowerPerlaserInPercentage * (r / 100);
+  if (currentMaxPowerRgbPercentage > (settings.maxPowerPerlaserInPercentage * 3))
+  {
+    // Limit the laser power: scale each channel onto the 0..maxPower range.
+    // Multiply BEFORE dividing -- (r / 100) in integer math is 0 for any value
+    // below 100, which blacked out limited channels instead of dimming them.
+    // The result never exceeds maxPowerPerlaserInPercentage per channel.
+    r = settings.maxPowerPerlaserInPercentage * r / 100;
+    g = settings.maxPowerPerlaserInPercentage * g / 100;
+    b = settings.maxPowerPerlaserInPercentage * b / 100;
   }
 
   dac1.setVoltageA(map(r, 0, 100, 0, 3500));
@@ -148,14 +208,20 @@ void Laser::setLaserPower(byte red, byte green, byte blue) {
 
   dac2.setVoltageA(map(b, 0, 100, 0, 2750));
   dac2.updateDAC();
-  delayMicroseconds(5);
+}
+
+void Laser::setLaserPower(byte red, byte green, byte blue)
+{
+  applyLaserPower(red, green, blue);
+  delayMicroseconds(5); // let the DACs settle so the points reach full power
 }
 
 /**
   @brief This function turns off the lasers and disables the possibility to turn them on
          this can be used in case there is an emergency. Call enableLasers to enable the laser module again
 */
-void Laser::disableLasers() {
+void Laser::disableLasers()
+{
   dac1.setVoltageA(0);
   dac1.setVoltageB(0);
   dac1.updateDAC();
@@ -167,9 +233,10 @@ void Laser::disableLasers() {
 }
 
 /**
-  @brief This function enables the laser module to be turned on again 
+  @brief This function enables the laser module to be turned on again
 */
-void Laser::enableLasers() {
+void Laser::enableLasers()
+{
   _laserOutputDisabled = false;
 }
 
@@ -177,7 +244,8 @@ void Laser::enableLasers() {
  @brief This function checks if the feedback of the galvo's is working by sending them to their maximums positions and reading the feedback signal from the galvo's.
  @return boolean true if the test succeeded false if the test fails
 */
-bool Laser::testGalvoFeedback() {
+bool Laser::testGalvoFeedback()
+{
   sendTo(-4000, -4000);
   delay(500);
 
