@@ -14,5 +14,5 @@ const String ExitMenuName = "Exit";
 
 LaserMode CurrentLaserMode = LaserMode::NotSelected;
 String SelectedSDCardFilename = "";
-JsonDocument SelectedSDCardJson;
-bool LoopSDCardPlayback = false;
+std::vector<uint8_t> LiveShowData;
+volatile bool LiveShowPending = false;

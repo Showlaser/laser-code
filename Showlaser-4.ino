@@ -10,8 +10,12 @@
 #include <vector>
 
 #include "Modes/IMode.h"
+#include "Modes/ShowPlayerMode.h"
+#include "Modes/ShowPlayerMode.cpp"
 #include "Modes/PlaySDFileMode.h"
 #include "Modes/PlaySDFileMode.cpp"
+#include "Modes/NetworkPlayMode.h"
+#include "Modes/NetworkPlayMode.cpp"
 
 #include "Menus/IMenu.h"
 #include "Menus/MainMenu.h"
@@ -36,7 +40,7 @@ RealtimePlayer _player;
 OledModule _oledModule;
 NetworkController _networkController;
 
-const int _modesLength = 1;
+const int _modesLength = 2;
 IMode *_modes[_modesLength];
 
 LaserMode _previousSelectedLaserMode = LaserMode::NotSelected;
@@ -124,6 +128,7 @@ void initializeMenus()
 void initializeModes()
 {
   _modes[0] = new PlaySDFileMode(_laser, _player);
+  _modes[1] = new NetworkPlayMode(_laser, _player);
 }
 
 bool emergencyButtonIsPressedOrDisconnected()
@@ -235,6 +240,16 @@ void executeSelectedMode()
     {
       _laser.setLaserPower(0, 0, 0);
       return;
+    }
+
+    // Switched directly from one active mode to another (e.g. a live upload
+    // preempts an SD show): stop the previous one so it releases its source and
+    // resets, rather than resuming stale state later. _previousSelectedLaserMode
+    // holds the previous mode's array index.
+    if (_previousSelectedLaserMode != LaserMode::NotSelected &&
+        (int)_previousSelectedLaserMode != selectedModeId)
+    {
+      _modes[_previousSelectedLaserMode]->stop();
     }
 
     _modes[selectedModeId]->execute();

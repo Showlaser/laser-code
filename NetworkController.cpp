@@ -17,6 +17,11 @@ IPAddress broadcastIP(192, 168, 1, 255); // Broadcast address
 unsigned int _udpPort = 8888;
 unsigned int _tcpPort = 5004;
 
+// Upper bound on a live pattern/animation upload held in RAM. Patterns and
+// typical animations are far smaller; this rejects anything lasershow-sized so a
+// live upload can never starve controller RAM.
+static const uint32_t MAX_LIVE_SHOW_BYTES = 128UL * 1024UL;
+
 /**
   @brief Generate a MAC address for the Teensy
 
@@ -449,6 +454,57 @@ String NetworkController::onSDCardBinaryUpload(IPAddress &serverAddress, const S
              : "{\"success\":false}";
 }
 
+String NetworkController::onLiveShowUpload(IPAddress &serverAddress, const String &json)
+{
+  // The body was already streamed into RAM in getRequestData; report the outcome
+  // it recorded. On success it also set CurrentLaserMode = Network, so
+  // NetworkPlayMode will pick up the blob on the next loop iteration.
+  return _lastBinaryUploadSucceeded
+             ? "{\"success\":true}"
+             : "{\"success\":false}";
+}
+
+String NetworkController::onPlaySDCardFile(IPAddress &serverAddress, const String &json)
+{
+  _watchdog.feed();
+
+  JsonDocument doc;
+  DeserializationError error = deserializeJson(doc, json);
+  if (error)
+  {
+    Serial.print("deserializeJson() failed: ");
+    Serial.println(error.c_str());
+    return "{\"success\":false,\"error\":\"invalid json\"}";
+  }
+
+  String filename = doc["filename"];
+  if (filename.length() == 0)
+  {
+    return "{\"success\":false,\"error\":\"missing filename\"}";
+  }
+  if (!SD.exists(filename.c_str()))
+  {
+    return "{\"success\":false,\"error\":\"file not found\"}";
+  }
+
+  // Hand off to PlaySDFileMode, which opens/validates/streams the .lzs from SD.
+  // The show streams frame-by-frame off the SD card, so size is not limited by
+  // RAM (unlike a live pattern/animation upload).
+  SelectedSDCardFilename = filename;
+  CurrentLaserMode = LaserMode::SDCardMode;
+
+  return "{\"success\":true}";
+}
+
+String NetworkController::onStopPlayback(IPAddress &serverAddress, const String &json)
+{
+  // Return to no mode; the main loop then calls the active mode's stop(), which
+  // blanks the laser and releases its source. Works for both an SD lasershow and
+  // a live pattern/animation preview.
+  CurrentLaserMode = LaserMode::NotSelected;
+  return "{\"success\":true}";
+}
+
 String NetworkController::onSDCardDeleteJsonFile(IPAddress &serverAddress, const String &json)
 {
   _watchdog.feed();
@@ -624,6 +680,50 @@ void NetworkController::getRequestData(EthernetClient &client, String &httpMetho
     return;
   }
 
+  // --- Streaming binary LIVE upload: stream the body into a RAM buffer ---
+  // Patterns/animations are played live and NOT stored on the laser, so the body
+  // (an ".lzs" blob) goes straight into RAM (LiveShowData) rather than the SD
+  // card. A size guard rejects anything too large to protect controller RAM. On
+  // success NetworkPlayMode picks up the blob and begins looping it. The
+  // connection is closed per request (Connection: close), so an unread body from
+  // a rejected upload is simply discarded -- no need to drain it.
+  if (httpMethod == "POST" && endPoint == "/live-binary")
+  {
+    _lastBinaryUploadSucceeded = false;
+
+    if (chunked || contentLength <= 0 || (uint32_t)contentLength > MAX_LIVE_SHOW_BYTES)
+    {
+      return; // unsupported framing or oversized -> reported as failure
+    }
+
+    LiveShowData.clear();
+    LiveShowData.reserve((size_t)contentLength);
+
+    int bytesRead = 0;
+    for (int i = 0; i < contentLength; i++)
+    {
+      int b = readByte();
+      if (b < 0)
+      {
+        break; // client stalled or disconnected
+      }
+      LiveShowData.push_back((uint8_t)b);
+      bytesRead++;
+    }
+
+    if (bytesRead == contentLength)
+    {
+      LiveShowPending = true;
+      CurrentLaserMode = LaserMode::Network;
+      _lastBinaryUploadSucceeded = true;
+    }
+    else
+    {
+      LiveShowData.clear();
+    }
+    return;
+  }
+
   // --- Read the body ---
   if (chunked)
   {
@@ -712,6 +812,18 @@ std::vector<KeyValue> NetworkController::createDict()
       {"POST", "/sd-card-binary", [this](IPAddress serverAddress, const String json)
        {
          return onSDCardBinaryUpload(serverAddress, json);
+       }},
+      {"POST", "/live-binary", [this](IPAddress serverAddress, const String json)
+       {
+         return onLiveShowUpload(serverAddress, json);
+       }},
+      {"POST", "/sd-card-play", [this](IPAddress serverAddress, const String json)
+       {
+         return onPlaySDCardFile(serverAddress, json);
+       }},
+      {"POST", "/stop", [this](IPAddress serverAddress, const String json)
+       {
+         return onStopPlayback(serverAddress, json);
        }},
       {"POST", "/pattern", [this](IPAddress serverAddress, const String json)
        {

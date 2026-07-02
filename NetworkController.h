@@ -58,6 +58,9 @@ private:
   String onSDCardFilesRequest(IPAddress &serverAddress, const String &json);
   String onSDCardReadJsonFile(IPAddress &serverAddress, const String &json);
   String onSDCardBinaryUpload(IPAddress &serverAddress, const String &json);
+  String onLiveShowUpload(IPAddress &serverAddress, const String &json);
+  String onPlaySDCardFile(IPAddress &serverAddress, const String &json);
+  String onStopPlayback(IPAddress &serverAddress, const String &json);
   String onSDCardDeleteJsonFile(IPAddress &serverAddress, const String &json);
   String onProjectPattern(IPAddress &serverAddress, const String &json);
 

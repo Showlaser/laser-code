@@ -1,6 +1,7 @@
 #ifndef GLOBALCONFIG_H
 #define GLOBALCONFIG_H
 #include <ArduinoJson.h>
+#include <vector>
 
 #include "Arduino.h"
 
@@ -25,7 +26,12 @@ enum LaserMode
 
 extern LaserMode CurrentLaserMode;
 extern String SelectedSDCardFilename;
-extern JsonDocument SelectedSDCardJson;
-extern bool LoopSDCardPlayback; // when true, the SD/embedded show replays instead of ending
+
+// Live pattern/animation playback handoff: the /live-binary receiver streams the
+// uploaded ".lzs" blob into LiveShowData and raises LiveShowPending; NetworkPlayMode
+// moves the blob into its MemoryShow and starts looping it. Both run in the main
+// loop (never the ISR), so this handoff needs no locking.
+extern std::vector<uint8_t> LiveShowData;
+extern volatile bool LiveShowPending;
 
 #endif
