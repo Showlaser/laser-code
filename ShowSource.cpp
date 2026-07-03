@@ -51,6 +51,55 @@ void ShowSource::rewind()
   }
 }
 
+bool ShowSource::seekToTimeMs(uint32_t targetMs, uint32_t &frameStartMs)
+{
+  if (!_open)
+  {
+    return false;
+  }
+
+  rewind();
+  uint32_t cumulative = 0;
+
+  while (_framesRead < _frameCount)
+  {
+    uint32_t frameOffset = position();
+
+    uint16_t durationMs = 0;
+    uint16_t pathCount = 0;
+    if (!readRaw(durationMs) || !readRaw(pathCount))
+    {
+      return false; // truncated
+    }
+
+    if (cumulative + durationMs > targetMs)
+    {
+      // This frame contains the target; rewind to its header so the caller's
+      // next readNextFrame() plays it.
+      seekTo(frameOffset);
+      frameStartMs = cumulative;
+      return true;
+    }
+
+    // Skip this frame's point data without materializing it (a point is
+    // i16 x, i16 y, u8 r, u8 g, u8 b = 7 bytes).
+    for (uint16_t pi = 0; pi < pathCount; pi++)
+    {
+      uint16_t pointCount = 0;
+      if (!readRaw(pointCount))
+      {
+        return false;
+      }
+      seekTo(position() + (uint32_t)pointCount * 7u);
+    }
+
+    cumulative += durationMs;
+    _framesRead++;
+  }
+
+  return false; // target lies beyond the end of the show
+}
+
 bool ShowSource::readNextFrame()
 {
   if (!_open || _framesRead >= _frameCount)

@@ -9,7 +9,7 @@ void SDCardMenu::displayMenu(OledModule &oledModule, String &currentSelectedMenu
   // render) could invalidate a show stream that is playing from it.
   SDCard sdCard;
 
-  std::vector<String> menuItemsVector = sdCard.getJsonFiles();
+  std::vector<String> menuItemsVector = sdCard.getLzsFiles();
   const int menuItemsLength = menuItemsVector.size() + 1;
 
   String menuItems[menuItemsLength];

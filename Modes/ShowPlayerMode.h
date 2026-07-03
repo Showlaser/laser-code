@@ -64,6 +64,7 @@ private:
   long _ticksLeftInCluster = 0; // remaining point-clock ticks for current frame
   long _lapTicks = 0;           // total ticks one full pass of _lap occupies (dwell-aware)
   size_t _lapIndex = 0;         // round-robin position within _lap
+  uint32_t _cumulativeMs = 0;   // show time at the start of the frame being fed
   int _lastX = 0;               // logical galvo position carried between laps
   int _lastY = 0;
 
@@ -76,6 +77,7 @@ private:
   void buildLapFromCurrentFrame();
   void appendSegment(int x0, int y0, int x1, int y1, byte r, byte g, byte b);
   void reportUnderruns();
+  void seekTo(uint32_t targetMs);
 };
 
 #endif

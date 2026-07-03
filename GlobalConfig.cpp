@@ -16,3 +16,5 @@ LaserMode CurrentLaserMode = LaserMode::NotSelected;
 String SelectedSDCardFilename = "";
 std::vector<uint8_t> LiveShowData;
 volatile bool LiveShowPending = false;
+volatile uint32_t PlaybackPositionMs = 0;
+volatile int32_t SeekRequestMs = -1;

@@ -34,4 +34,12 @@ extern String SelectedSDCardFilename;
 extern std::vector<uint8_t> LiveShowData;
 extern volatile bool LiveShowPending;
 
+// Playback timeline handoff (all main-loop context, no locking, like the live
+// show handoff above): the playing mode keeps PlaybackPositionMs at the show
+// time of the frame it is currently feeding, which the API exposes for the
+// frontend's timeline. SeekRequestMs is set by the /seek endpoint (-1 = none)
+// and consumed by the playing mode, which jumps to that show time.
+extern volatile uint32_t PlaybackPositionMs;
+extern volatile int32_t SeekRequestMs;
+
 #endif

@@ -48,6 +48,17 @@ public:
   */
   void rewind();
 
+  /**
+    @brief Positions the stream so the next readNextFrame() returns the frame
+           containing targetMs (frame start times are the cumulative frame
+           durations). Frames are skipped by seeking past their point data, so
+           this is fast even for long shows. Returns false when targetMs lies
+           at/beyond the end of the show (the stream is then at an undefined
+           frame; rewind before reading). On success frameStartMs holds the
+           found frame's start time on the show's timeline.
+  */
+  bool seekToTimeMs(uint32_t targetMs, uint32_t &frameStartMs);
+
   uint32_t kpps() const { return _kpps; }
   uint32_t frameCount() const { return _frameCount; }
 

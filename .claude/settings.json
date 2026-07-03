@@ -28,7 +28,9 @@
       "Bash(xxd -l 16 /c/Users/Vincent/Downloads/spooky.lzs)",
       "Read(//d/Deze Pc/Documenten/Projecten/Laser projector/Versie 4/Software/Pc software/LaserAPI/LaserAPI/Models/Helper/**)",
       "PowerShell(dotnet build \"d:\\\\Deze Pc\\\\Documenten\\\\Projecten\\\\Laser projector\\\\Versie 4\\\\Software\\\\Pc software\\\\LaserAPI\\\\LaserAPI\\\\LaserAPI.csproj\" -t:Compile -v q 2>&1)",
-      "Read(//d/Deze Pc/Documenten/Projecten/Laser projector/Versie 4/Software/Pc software/LaserAPI/LaserAPI/**)"
+      "Read(//d/Deze Pc/Documenten/Projecten/Laser projector/Versie 4/Software/Pc software/LaserAPI/LaserAPI/**)",
+      "Read(//d/Deze Pc/Documenten/Projecten/Laser projector/Versie 4/Software/Pc software/Laser-frontend/src/services/shared/api/**)",
+      "Read(//d/Deze Pc/Documenten/Projecten/Laser projector/Versie 4/Software/Pc software/Laser-frontend/src/components/animation/animation-keyframe-editor/**)"
     ],
     "additionalDirectories": [
       "d:\\Deze Pc\\Documenten\\Projecten\\Laser projector\\Versie 4\\Software\\Pc software\\LaserAPI\\LaserAPI\\Logic",
@@ -41,7 +43,10 @@
       "d:\\Deze Pc\\Documenten\\Projecten\\Laser projector\\Versie 4\\Software\\Pc software\\Laser-frontend\\src\\components\\animation\\animation-keyframe-editor",
       "d:\\Deze Pc\\Documenten\\Projecten\\Laser projector\\Versie 4\\Software\\Pc software\\Laser-frontend\\src\\components\\pattern\\svg-to-coordinates-converter",
       "d:\\Deze Pc\\Documenten\\Projecten\\Laser projector\\Versie 4\\Software\\Pc software\\Laser-frontend\\src\\components\\shared\\points-drawer",
-      "C:\\Users\\Vincent\\Downloads"
+      "C:\\Users\\Vincent\\Downloads",
+      "d:\\Deze Pc\\Documenten\\Projecten\\Laser projector\\Versie 4\\Software\\Pc software\\Laser-frontend\\src\\models\\components\\shared",
+      "d:\\Deze Pc\\Documenten\\Projecten\\Laser projector\\Versie 4\\Software\\Pc software\\Laser-frontend\\src\\components\\showlaser-manager\\showlaser-sdcard",
+      "d:\\Deze Pc\\Documenten\\Projecten\\Laser projector\\Versie 4\\Software\\Pc software\\LaserAPI\\LaserAPI\\Models\\FromLaser"
     ]
   }
 }

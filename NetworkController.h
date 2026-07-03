@@ -56,12 +56,13 @@ private:
   String onSettingsRequest(IPAddress &serverAddress, const String &json);
   String onIncommingAliveCheck(IPAddress &serverAddress, const String &json);
   String onSDCardFilesRequest(IPAddress &serverAddress, const String &json);
-  String onSDCardReadJsonFile(IPAddress &serverAddress, const String &json);
   String onSDCardBinaryUpload(IPAddress &serverAddress, const String &json);
   String onLiveShowUpload(IPAddress &serverAddress, const String &json);
   String onPlaySDCardFile(IPAddress &serverAddress, const String &json);
   String onStopPlayback(IPAddress &serverAddress, const String &json);
-  String onSDCardDeleteJsonFile(IPAddress &serverAddress, const String &json);
+  String onPlaybackStatusRequest(IPAddress &serverAddress, const String &json);
+  String onSeekPlayback(IPAddress &serverAddress, const String &json);
+  String onSDCardDeleteFile(IPAddress &serverAddress, const String &json);
 
   bool sendNetworkRequest(const String &httpMethod, const String &endPoint, IPAddress &serverAddress, const String &json);
   String ipToString(IPAddress ip);

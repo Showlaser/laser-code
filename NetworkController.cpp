@@ -427,23 +427,29 @@ String NetworkController::onSDCardFilesRequest(IPAddress &serverAddress, const S
 {
   _watchdog.feed();
 
-  std::vector<String> files = _sdCard.getJsonFiles();
+  std::vector<String> files = _sdCard.getLzsFiles();
   JsonDocument doc;
   JsonArray fileArray = doc.to<JsonArray>();
   for (const String &file : files)
   {
-    String fileJsonContent = _sdCard.readJsonFile(file);
-
     JsonObject model = fileArray.add<JsonObject>();
     model["filename"] = file;
-    model["fileJson"] = fileJsonContent;
+
+    // Size in whole KB, rounded up so a non-empty file never shows as 0 KB.
+    uint32_t sizeKb = 0;
+    File entry = SD.open(file.c_str());
+    if (entry)
+    {
+      sizeKb = (uint32_t)((entry.size() + 1023) / 1024);
+      entry.close();
+    }
+    model["fileSizeKb"] = sizeKb;
   }
 
   String response;
   serializeJson(doc, response);
   return response;
 }
-
 
 String NetworkController::onSDCardBinaryUpload(IPAddress &serverAddress, const String &json)
 {
@@ -505,7 +511,48 @@ String NetworkController::onStopPlayback(IPAddress &serverAddress, const String 
   return "{\"success\":true}";
 }
 
-String NetworkController::onSDCardDeleteJsonFile(IPAddress &serverAddress, const String &json)
+String NetworkController::onPlaybackStatusRequest(IPAddress &serverAddress, const String &json)
+{
+  // Position is maintained by the playing mode (frame granularity); the
+  // frontend polls this to move its timeline slider.
+  bool playing = CurrentLaserMode == LaserMode::SDCardMode ||
+                 CurrentLaserMode == LaserMode::Network;
+
+  JsonDocument doc;
+  doc["playing"] = playing;
+  doc["positionMs"] = (uint32_t)PlaybackPositionMs;
+
+  String response;
+  serializeJson(doc, response);
+  return response;
+}
+
+String NetworkController::onSeekPlayback(IPAddress &serverAddress, const String &json)
+{
+  _watchdog.feed();
+
+  JsonDocument doc;
+  DeserializationError error = deserializeJson(doc, json);
+  if (error)
+  {
+    Serial.print("deserializeJson() failed: ");
+    Serial.println(error.c_str());
+    return "{\"success\":false,\"error\":\"invalid json\"}";
+  }
+
+  long positionMs = doc["positionMs"] | -1L;
+  if (positionMs < 0)
+  {
+    return "{\"success\":false,\"error\":\"missing positionMs\"}";
+  }
+
+  // Consumed by the playing mode on its next produce iteration; ignored when
+  // nothing is playing.
+  SeekRequestMs = (int32_t)positionMs;
+  return "{\"success\":true}";
+}
+
+String NetworkController::onSDCardDeleteFile(IPAddress &serverAddress, const String &json)
 {
   _watchdog.feed();
 
@@ -519,7 +566,7 @@ String NetworkController::onSDCardDeleteJsonFile(IPAddress &serverAddress, const
   }
 
   String filename = doc["filename"];
-  bool success = _sdCard.deleteJsonFile(filename);
+  bool success = _sdCard.deleteLzsFile(filename);
   Serial.println("SD card delete success: " + String(success) + " for file: " + filename);
 
   return success
@@ -794,7 +841,7 @@ std::vector<KeyValue> NetworkController::createDict()
        }},
       {"PUT", "/sd-card", [this](IPAddress serverAddress, const String json)
        {
-         return onSDCardDeleteJsonFile(serverAddress, json);
+         return onSDCardDeleteFile(serverAddress, json);
        }},
       {"POST", "/sd-card-binary", [this](IPAddress serverAddress, const String json)
        {
@@ -811,6 +858,14 @@ std::vector<KeyValue> NetworkController::createDict()
       {"POST", "/stop", [this](IPAddress serverAddress, const String json)
        {
          return onStopPlayback(serverAddress, json);
+       }},
+      {"GET", "/playback-status", [this](IPAddress serverAddress, const String json)
+       {
+         return onPlaybackStatusRequest(serverAddress, json);
+       }},
+      {"POST", "/seek", [this](IPAddress serverAddress, const String json)
+       {
+         return onSeekPlayback(serverAddress, json);
        }},
   };
 }

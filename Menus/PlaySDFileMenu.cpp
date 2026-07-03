@@ -37,7 +37,7 @@ void PlaySDFileMenu::displayMenu(OledModule &oledModule, String &currentSelected
 
       if (itemToShowCursorAt == "Delete " + SelectedSDCardFilename)
       {
-        sdCard.deleteJsonFile(SelectedSDCardFilename);
+        sdCard.deleteLzsFile(SelectedSDCardFilename);
         SelectedSDCardFilename = "";
         currentSelectedMenu = SDCardMenuName;
         CurrentLaserMode = LaserMode::NotSelected;

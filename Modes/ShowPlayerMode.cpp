@@ -41,6 +41,8 @@ void ShowPlayerMode::resetState()
   _lastY = 0;
   _lastUnderrunReport = 0;
   _lastUnderrunCount = 0;
+  _cumulativeMs = 0;
+  PlaybackPositionMs = 0;
   _lap.clear();
 }
 
@@ -197,6 +199,14 @@ void ShowPlayerMode::execute()
     _player.start(_baseClockHz);
   }
 
+  // A seek request from the API: jump the producer to the requested show time.
+  if (SeekRequestMs >= 0)
+  {
+    uint32_t target = (uint32_t)SeekRequestMs;
+    SeekRequestMs = -1;
+    seekTo(target);
+  }
+
   // Producer: keep the ring topped up. Each frame is drawn as a "lap" (one full
   // pass of the shape). The lap is repeated to fill the frame's tick budget so
   // the show plays at the correct wall-clock speed and stays bright. Crucially we
@@ -217,6 +227,7 @@ void ShowPlayerMode::execute()
           break;
         }
         _source->rewind();
+        _cumulativeMs = 0; // wrapped back to the start of the show
         if (!_source->readNextFrame())
         {
           _producingDone = true; // empty show; nothing to loop
@@ -229,6 +240,10 @@ void ShowPlayerMode::execute()
       _ticksLeftInCluster = ms * (long)_baseClockHz / 1000L;
       _lapIndex = 0;
       _needNewFrame = false;
+
+      // Publish where we are on the show's timeline (start of this frame).
+      PlaybackPositionMs = _cumulativeMs;
+      _cumulativeMs += (uint32_t)ms;
     }
 
     const OutPoint &point = _lap[_lapIndex];
@@ -278,6 +293,40 @@ void ShowPlayerMode::reportUnderruns()
     }
     _lastUnderrunReport = now;
   }
+}
+
+/**
+  @brief Jumps playback to targetMs on the show's timeline (frame granularity).
+         The point clock is restarted to flush already-queued points, so the
+         jump is heard immediately instead of after ~100 ms of old ring content
+         drains; the restart blanks the laser for the instant of the jump,
+         which is the safe direction.
+*/
+void ShowPlayerMode::seekTo(uint32_t targetMs)
+{
+  if (!_started || _source == nullptr)
+  {
+    return; // nothing playing; ignore the request
+  }
+
+  uint32_t frameStartMs = 0;
+  if (_source->seekToTimeMs(targetMs, frameStartMs))
+  {
+    _cumulativeMs = frameStartMs;
+    _producingDone = false; // seeking during the end-drain resumes playback
+  }
+  else
+  {
+    // Target at/beyond the end (or unreadable): wrap a looping show back to
+    // its start; let a non-looping one finish.
+    _source->rewind();
+    _cumulativeMs = 0;
+    _producingDone = !_loop;
+  }
+
+  _needNewFrame = true; // load the target frame on the next produce iteration
+  PlaybackPositionMs = _cumulativeMs;
+  _player.start(_baseClockHz); // flush points queued from the old position
 }
 
 void ShowPlayerMode::restart()

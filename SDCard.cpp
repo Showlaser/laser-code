@@ -22,7 +22,7 @@ bool SDCard::init()
   return SD.begin(chipSelect);
 }
 
-std::vector<String> SDCard::getJsonFiles()
+std::vector<String> SDCard::getLzsFiles()
 {
   std::vector<String> items;
 
@@ -37,7 +37,7 @@ std::vector<String> SDCard::getJsonFiles()
       break; // no more files
     }
 
-    if (!entry.isDirectory() && (strstr(entry.name(), ".lzs") || strstr(entry.name(), ".json")))
+    if (!entry.isDirectory() && (strstr(entry.name(), ".lzs")))
     {
       items.push_back(entry.name());
     }
@@ -48,38 +48,9 @@ std::vector<String> SDCard::getJsonFiles()
   return items;
 }
 
-String SDCard::readJsonFile(String fileName)
+bool SDCard::deleteLzsFile(String fileName)
 {
-  if (!fileName.endsWith(".json"))
-  {
-    return "";
-  }
-
-  File jsonFile = SD.open(fileName.c_str());
-  if (!jsonFile)
-  {
-    return "";
-  }
-
-  String result;
-  while (jsonFile.available())
-  {
-    char c = jsonFile.read();
-    result += c;
-
-    if (c == 0)
-    {
-      break;
-    }
-  }
-
-  jsonFile.close();
-  return result;
-}
-
-bool SDCard::deleteJsonFile(String fileName)
-{
-  if (!SD.exists(fileName.c_str()) || !fileName.endsWith(".json"))
+  if (!SD.exists(fileName.c_str()) || !fileName.endsWith(".lzs"))
   {
     return false;
   }
