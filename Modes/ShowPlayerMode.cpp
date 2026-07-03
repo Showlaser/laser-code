@@ -3,7 +3,7 @@
 // Maximum galvo step (in logical -4000..4000 units) between two emitted points.
 // Smaller = smoother lines but more points per lap. This is the producer-side
 // stand-in for the PC "maxStepPerTick" resample that arrives in a later phase.
-static const int MAX_STEP = 80;
+static const int MAX_STEP = 200;
 
 // How much headroom to keep before topping up, so each execute() pushes a batch
 // rather than one point at a time.
@@ -14,6 +14,34 @@ static const uint16_t REFILL_BATCH = 64;
 // shape rounds/bows. The hold is specified in TIME and converted to base-clock
 // ticks per show, so corners settle equally long at every point rate.
 static const uint32_t CORNER_DWELL_US = 200;
+
+// Maximum galvo step per tick while the beam is BLANKED. Nobody sees the path
+// of an invisible move, so it may step far coarser than a lit line -- but it
+// must still STEP rather than jump outright: commanding a full-field jump in
+// one tick leaves an (underdamped) galvo ringing at the destination, and the
+// next lit point then paints a streak instead of a dot. Coarse guided steps
+// arrive much calmer while costing only a fraction of the old fine
+// interpolation (which dominated laps of scattered points and caused flicker).
+static const int BLANK_STEP = 600;
+
+// Settle time at the END of every blanked move, before the next lit point
+// ignites. An underdamped galvo RINGS after arriving, and the ring's duration
+// is set by the servo damping -- largely INDEPENDENT of the jump distance
+// (short jumps ring almost as long, just with less amplitude) -- so this is a
+// fixed time, not distance-scaled. Raise it until scattered dots stop
+// streaking: the smallest such value measures the galvos' ring-out time.
+// Well-damped scanners settle in a few hundred us; undertuned ones can need
+// milliseconds, which physically caps how many scattered dots fit in a
+// flicker-free lap -- the real cure for that is the damping trim, not software.
+static const uint32_t BLANK_SETTLE_US = 800;
+
+// Time to hold at the START of a blanked move, laser commanded off, BEFORE the
+// mirrors begin to travel. The RGB DACs settle in microseconds, but the laser
+// driver/diode chain takes far longer to actually go dark; departing
+// immediately paints the departure path with the decaying beam (streaks
+// instead of dots on scattered-point shows). The smallest value that removes
+// the streaks is a direct measurement of the drivers' turn-off time.
+static const uint32_t BLANK_OFF_SETTLE_US = 300;
 
 // Allowed range for the point clock. A show's exported kpps is honored within
 // this range. 40k matches the exporter's default galvo speed; the galvos only
@@ -48,15 +76,58 @@ void ShowPlayerMode::resetState()
 
 /**
   @brief Appends the points of one segment (excluding its start) to the current
-         lap, interpolating so no step exceeds MAX_STEP, projection-mapping each
-         emitted point. r/g/b = 0 means a blanked (laser-off) transit move.
+         lap, projection-mapping each emitted point. Lit segments interpolate at
+         MAX_STEP so the drawn line is straight. A blanked segment (r/g/b = 0)
+         is an invisible transit: it first holds its departure position until
+         the laser has gone dark, then steps coarsely (BLANK_STEP) and settles
+         at the destination before the next lit point.
 */
 void ShowPlayerMode::appendSegment(int x0, int y0, int x1, int y1, byte r, byte g, byte b)
 {
   int dx = x1 - x0;
   int dy = y1 - y0;
   int dist = max(abs(dx), abs(dy));
-  int steps = dist / MAX_STEP;
+
+  // Blanked moves step coarsely and settle longer at the end (see BLANK_STEP /
+  // BLANK_SETTLE_US); lit segments step finely so the drawn line is straight,
+  // and settle one corner hold.
+  bool blanked = (r == 0 && g == 0 && b == 0);
+  int stepSize = blanked ? BLANK_STEP : MAX_STEP;
+
+  uint16_t endDwell = _cornerDwellTicks;
+  if (blanked)
+  {
+    uint32_t settleTicks = (BLANK_SETTLE_US * _baseClockHz) / 1000000UL;
+    if (settleTicks > _cornerDwellTicks)
+    {
+      endDwell = (uint16_t)settleTicks;
+    }
+  }
+
+  if (blanked && dist > 0)
+  {
+    // Hold the departure position until the laser has actually gone dark
+    // (see BLANK_OFF_SETTLE_US), so the decaying beam cannot paint the
+    // departure path.
+    uint32_t offTicks = (BLANK_OFF_SETTLE_US * _baseClockHz) / 1000000UL;
+    if (offTicks > 0)
+    {
+      int holdX = x0;
+      int holdY = y0;
+      _laser.projectionMap(holdX, holdY);
+
+      OutPoint hold;
+      hold.x = (int16_t)holdX;
+      hold.y = (int16_t)holdY;
+      hold.r = 0;
+      hold.g = 0;
+      hold.b = 0;
+      hold.dwell = (uint16_t)offTicks;
+      _lap.push_back(hold);
+    }
+  }
+
+  int steps = dist / stepSize;
   if (steps < 1)
   {
     steps = 1;
@@ -74,10 +145,10 @@ void ShowPlayerMode::appendSegment(int x0, int y0, int x1, int y1, byte r, byte 
     p.r = r;
     p.g = g;
     p.b = b;
-    // The last emitted point of a segment lands exactly on the target vertex
-    // (a corner); hold it so the galvo settles before the next edge. Interior
-    // interpolation points move on immediately.
-    p.dwell = (i == steps) ? _cornerDwellTicks : 1;
+    // The last emitted point of a segment lands exactly on the target: hold it
+    // (corner hold, or the blank settle) so the galvo comes to rest before
+    // what follows. Interior interpolation points move on immediately.
+    p.dwell = (i == steps) ? endDwell : 1;
     _lap.push_back(p);
   }
 }
@@ -212,38 +283,68 @@ void ShowPlayerMode::execute()
   // the show plays at the correct wall-clock speed and stays bright. Crucially we
   // only advance to the next frame at a LAP BOUNDARY: a shape with more points
   // than the tick budget is still drawn IN FULL (it just takes a little longer)
-  // instead of being cut off mid-shape. A lap is repeated only while a whole
-  // further pass still fits in the remaining budget, so timing stays close to
-  // nominal.
+  // instead of being cut off mid-shape.
+  //
+  // _ticksLeftInCluster is a RUNNING signed budget: whatever a frame consumed
+  // beyond (or left under) its nominal duration carries into the next frame
+  // instead of being discarded. A heavy frame whose single lap overruns its
+  // duration borrows time from the frames after it, and frames whose budget is
+  // consumed entirely by that debt are SKIPPED -- like a video player dropping
+  // frames -- so a heavy show finishes at its real wall-clock length instead of
+  // stretching (10s instead of 5s), and a light show no longer runs slightly
+  // fast from discarded remainders.
   while (_player.freeSpace() > REFILL_BATCH)
   {
     if (_needNewFrame)
     {
-      if (!_source->readNextFrame())
+      // Consume frames until one still has budget left after settling the
+      // carried debt; the ones in between are skipped without being drawn.
+      bool frameReady = false;
+      while (!frameReady)
       {
-        if (!_loop)
-        {
-          _producingDone = true;
-          break;
-        }
-        _source->rewind();
-        _cumulativeMs = 0; // wrapped back to the start of the show
         if (!_source->readNextFrame())
         {
-          _producingDone = true; // empty show; nothing to loop
-          break;
+          if (!_loop)
+          {
+            _producingDone = true;
+            break;
+          }
+          _source->rewind();
+          _cumulativeMs = 0; // wrapped back to the start of the show
+          // A show that cannot run at real time at all would carry an ever-
+          // growing debt and eventually skip entire passes; start each loop
+          // pass with a clean slate instead.
+          if (_ticksLeftInCluster < 0)
+          {
+            _ticksLeftInCluster = 0;
+          }
+          if (!_source->readNextFrame())
+          {
+            _producingDone = true; // empty show; nothing to loop
+            break;
+          }
         }
+
+        long ms = _source->currentDurationMs();
+        _ticksLeftInCluster += ms * (long)_baseClockHz / 1000L;
+
+        // Publish where we are on the show's timeline (start of this frame).
+        PlaybackPositionMs = _cumulativeMs;
+        _cumulativeMs += (uint32_t)ms;
+
+        // ">= 0" (not "> 0") so a zero-duration frame is still drawn: every
+        // drawn frame pushes at least one point, guaranteeing progress even in
+        // a show consisting only of such frames.
+        frameReady = _ticksLeftInCluster >= 0;
+      }
+      if (_producingDone)
+      {
+        break;
       }
 
       buildLapFromCurrentFrame();
-      long ms = _source->currentDurationMs();
-      _ticksLeftInCluster = ms * (long)_baseClockHz / 1000L;
       _lapIndex = 0;
       _needNewFrame = false;
-
-      // Publish where we are on the show's timeline (start of this frame).
-      PlaybackPositionMs = _cumulativeMs;
-      _cumulativeMs += (uint32_t)ms;
     }
 
     const OutPoint &point = _lap[_lapIndex];
@@ -276,23 +377,21 @@ void ShowPlayerMode::execute()
 }
 
 /**
-  @brief Reports ring underruns at most once a second, and only when the count
-         changed, so sustained producer starvation is visible without spam.
+  @brief Once per second: reports the ACHIEVED point rate against the configured
+         clock (well under _baseClockHz = the ISR cannot sustain the tick
+         period, e.g. SPI time per tick), plus ring underruns when the count
+         changed.
 */
 void ShowPlayerMode::reportUnderruns()
 {
   unsigned long now = millis();
-  if (now - _lastUnderrunReport >= 1000)
+  unsigned long elapsed = now - _lastUnderrunReport;
+  if (elapsed < 1000)
   {
-    uint32_t underruns = _player.underruns();
-    if (underruns != _lastUnderrunCount)
-    {
-      Serial.print("Ring underruns: ");
-      Serial.println(underruns);
-      _lastUnderrunCount = underruns;
-    }
-    _lastUnderrunReport = now;
+    return;
   }
+
+  _lastUnderrunReport = now;
 }
 
 /**
@@ -324,7 +423,8 @@ void ShowPlayerMode::seekTo(uint32_t targetMs)
     _producingDone = !_loop;
   }
 
-  _needNewFrame = true; // load the target frame on the next produce iteration
+  _needNewFrame = true;    // load the target frame on the next produce iteration
+  _ticksLeftInCluster = 0; // budget debt/credit from before the jump is meaningless now
   PlaybackPositionMs = _cumulativeMs;
   _player.start(_baseClockHz); // flush points queued from the old position
 }

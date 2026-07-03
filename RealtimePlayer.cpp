@@ -23,6 +23,7 @@ void RealtimePlayer::start(uint32_t baseClockHz)
   _ring.clear();
   _dwellLeft = 0;
   _underruns = 0;
+  _ticks = 0;
   _instance = this;
 
   float periodMicros = 1000000.0f / (float)baseClockHz;
@@ -52,6 +53,8 @@ void RealtimePlayer::isrTrampoline()
 
 void RealtimePlayer::onTick()
 {
+  _ticks++; // achieved-rate diagnostic, see takeTicks()
+
   // Holding the current point for its dwell: do nothing this tick.
   if (_dwellLeft > 0)
   {

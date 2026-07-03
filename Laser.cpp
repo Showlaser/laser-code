@@ -49,9 +49,7 @@ void Laser::init(WDT_T4<WDT1> &watchdog)
 
 /**
   @brief Applies the projection-zone mapping to a logical (-4000..4000)
-         coordinate, clamping to range first. This is the same mapping
-         sendTo() uses, factored out so the realtime producer can map points
-         before queueing them (keeping the mapping single-sourced).
+         coordinate, clamping to range first.
 */
 void Laser::projectionMap(int &x, int &y)
 {
@@ -85,51 +83,6 @@ void Laser::writeGalvoRaw(int x, int y)
 
   _xPos = x;
   _yPos = y;
-}
-
-/**
-  @brief sends the galvos to the specified position using logistic growth
-*/
-void Laser::sendTo(int newXPos, int newYPos)
-{
-  _watchdog.feed();
-
-  int xPos = newXPos;
-  int yPos = newYPos;
-  projectionMap(xPos, yPos);
-
-  int differenceX = (int)(max(_xPos, xPos) - min(_xPos, xPos));
-  int differenceY = (int)(max(_yPos, yPos) - min(_yPos, yPos));
-  int difference = max(differenceX, differenceY);
-
-  const float alpha = 0.05; // Lower values provide more smoothing
-
-  int steps = (int)(difference * 0.04);
-  for (int i = 0; i < steps; i++)
-  {
-    // Apply low-pass filter gradually to move toward target values
-    int x = _xPos + alpha * (xPos - _xPos);
-    int y = _yPos + alpha * (yPos - _yPos);
-
-    int xMappedToVoltage = mapXToVoltage(x);
-    dac3.setVoltageA(xMappedToVoltage);
-
-    int yMappedToVoltage = mapYToVoltage(y);
-    dac3.setVoltageB(yMappedToVoltage);
-    dac3.updateDAC();
-  }
-
-  int xMappedToVoltage = mapXToVoltage(xPos);
-  dac3.setVoltageA(xMappedToVoltage);
-
-  int yMappedToVoltage = mapYToVoltage(yPos);
-  dac3.setVoltageB(yMappedToVoltage);
-  dac3.updateDAC();
-
-  _watchdog.feed();
-
-  _xPos = xPos;
-  _yPos = yPos;
 }
 
 /**
@@ -222,14 +175,19 @@ void Laser::setLaserPower(byte red, byte green, byte blue)
 */
 void Laser::disableLasers()
 {
+  // Latch output off BEFORE zeroing the DACs. In the reverse order the realtime
+  // ISR could write laser power between our zero-write and the latch, and every
+  // later ISR call would early-return -- leaving the beam stuck ON at the last
+  // written power. With the latch set first, any concurrent ISR call is already
+  // a no-op and our zero-write below is guaranteed to be the last one.
+  _laserOutputDisabled = true;
+
   dac1.setVoltageA(0);
   dac1.setVoltageB(0);
   dac1.updateDAC();
 
   dac2.setVoltageA(0);
   dac2.updateDAC();
-
-  _laserOutputDisabled = true;
 }
 
 /**
@@ -246,13 +204,13 @@ void Laser::enableLasers()
 */
 bool Laser::testGalvoFeedback()
 {
-  sendTo(-4000, -4000);
+  writeGalvoRaw(-4000, -4000);
   delay(500);
 
   int previousXFeedback = analogRead(_xGalvoFeedbackSignal);
   int previousYFeedback = analogRead(_yGalvoFeedbackSignal);
 
-  sendTo(4000, 4000);
+  writeGalvoRaw(4000, 4000);
   delay(500);
 
   int xGalvoFeedbackReading = analogRead(_xGalvoFeedbackSignal);

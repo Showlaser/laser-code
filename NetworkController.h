@@ -44,7 +44,10 @@ public:
 private:
   WDT_T4<WDT1> _watchdog;
   SDCard _sdCard;
-  Laser _laser;
+  // Pointer to THE Laser instance the realtime ISR uses, not a copy: the
+  // emergency stop must set the output-disable latch on the real object or the
+  // ISR would keep lighting the beam.
+  Laser *_laser = nullptr;
   // Set by getRequestData while it streams a binary upload straight to SD;
   // read back by onSDCardBinaryUpload to build the response.
   bool _lastBinaryUploadSucceeded = false;
@@ -60,6 +63,7 @@ private:
   String onLiveShowUpload(IPAddress &serverAddress, const String &json);
   String onPlaySDCardFile(IPAddress &serverAddress, const String &json);
   String onStopPlayback(IPAddress &serverAddress, const String &json);
+  String onEmergencyStop(IPAddress &serverAddress, const String &json);
   String onPlaybackStatusRequest(IPAddress &serverAddress, const String &json);
   String onSeekPlayback(IPAddress &serverAddress, const String &json);
   String onSDCardDeleteFile(IPAddress &serverAddress, const String &json);

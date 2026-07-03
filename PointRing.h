@@ -8,7 +8,6 @@
 
   This is what the realtime consumer pops and writes; all decoding,
   interpolation and resampling has already happened in the producer.
-  X/Y are in the same -4000..4000 logical range used by Laser::sendTo.
   r/g/b are 0..100 laser power percentages (same units as setLaserPower).
   dwell is the number of base-clock ticks this point is held before the
   next point is popped (1 = output for a single tick).

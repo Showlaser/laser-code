@@ -5,10 +5,10 @@
 #include "Arduino.h"
 #include "Settings.h"
 
-class Laser {
+class Laser
+{
 public:
   void init(WDT_T4<WDT1> &watchdog);
-  void sendTo(int x, int y);
   void setLaserPower(byte red, byte green, byte blue);
 
   // --- Realtime output path (safe to call from the IntervalTimer ISR) ---
@@ -42,12 +42,14 @@ private:
   const byte _yGalvoFeedbackSignal = A2;
   const byte _xGalvoFeedbackSignal = A3;
 
-  int _realTimeYPos = 0;  // The y position based on the feedback signal from the galvo
-  int _realTimeXPos = 0;  // The x position based on the feedback signal from the galvo
+  int _realTimeYPos = 0; // The y position based on the feedback signal from the galvo
+  int _realTimeXPos = 0; // The x position based on the feedback signal from the galvo
   int _yPos = 0;
   int _xPos = 0;
 
-  bool _laserOutputDisabled = false;
+  // Latch that keeps the beam off after disableLasers() (emergency stop).
+  // volatile: written by the main loop, read by applyLaserPower() in the ISR.
+  volatile bool _laserOutputDisabled = false;
 };
 
 #endif

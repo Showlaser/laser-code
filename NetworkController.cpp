@@ -262,6 +262,7 @@ void NetworkController::init(WDT_T4<WDT1> &watchdog, SDCard &sdCard, Laser &lase
 {
   _watchdog = watchdog;
   _sdCard = sdCard;
+  _laser = &laser;
   byte mac[6];
   teensyMAC(mac);
 
@@ -508,6 +509,27 @@ String NetworkController::onStopPlayback(IPAddress &serverAddress, const String 
   // blanks the laser and releases its source. Works for both an SD lasershow and
   // a live pattern/animation preview.
   CurrentLaserMode = LaserMode::NotSelected;
+  return "{\"success\":true}";
+}
+
+String NetworkController::onEmergencyStop(IPAddress &serverAddress, const String &json)
+{
+  _watchdog.feed();
+
+  // Kill the beam IN THIS HANDLER, before anything else: disableLasers() latches
+  // output off (the ISR's applyLaserPower becomes a no-op) and zeroes the colour
+  // DACs, so the beam is dark even though the point clock may keep running for a
+  // few more loop iterations. Leaving the mode afterwards makes the main loop
+  // stop the playback engine, same as /stop. Output stays disabled until the
+  // laser is power-cycled: re-arming over the network on purpose requires a
+  // deliberate physical action, like a real emergency stop.
+  if (_laser != nullptr)
+  {
+    _laser->disableLasers();
+  }
+  CurrentLaserMode = LaserMode::NotSelected;
+
+  Serial.println("EMERGENCY STOP received via network; output disabled until power cycle");
   return "{\"success\":true}";
 }
 
@@ -858,6 +880,10 @@ std::vector<KeyValue> NetworkController::createDict()
       {"POST", "/stop", [this](IPAddress serverAddress, const String json)
        {
          return onStopPlayback(serverAddress, json);
+       }},
+      {"POST", "/emergency-stop", [this](IPAddress serverAddress, const String json)
+       {
+         return onEmergencyStop(serverAddress, json);
        }},
       {"GET", "/playback-status", [this](IPAddress serverAddress, const String json)
        {

@@ -46,6 +46,19 @@ public:
   // the producer can't keep up at the current base clock.
   uint32_t underruns() const { return _underruns; }
 
+  // Returns the number of ISR ticks since the previous call and resets the
+  // counter: the ACHIEVED point rate. Reporting well under the configured base
+  // clock means the ISR cannot finish within the tick period (e.g. SPI time),
+  // so the effective refresh rate is lower than requested. Diagnostic; the
+  // read-then-reset may lose a tick to a concurrent ISR, which is irrelevant
+  // at this precision.
+  uint32_t takeTicks()
+  {
+    uint32_t ticks = _ticks;
+    _ticks = 0;
+    return ticks;
+  }
+
   // --- Producer side ---
   uint16_t freeSpace() { return _ring.freeSpace(); }
   bool push(const OutPoint &p) { return _ring.push(p); }
@@ -64,6 +77,7 @@ private:
   volatile uint16_t _dwellLeft = 0;
   volatile bool _running = false;
   volatile uint32_t _underruns = 0;
+  volatile uint32_t _ticks = 0;
 };
 
 #endif

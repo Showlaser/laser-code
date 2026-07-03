@@ -267,21 +267,42 @@ void executeSelectedMode()
   }
   else if (_previousModeId != -1)
   {
-    _laser.setLaserPower(0, 0, 0);
+    // Stop the point clock BEFORE commanding the blank. The ISR shares the DAC
+    // driver objects with this code; a tick landing between our setVoltage and
+    // updateDAC can interleave lit channel values into the blank write, leaving
+    // a static lit point. stop() halts the clock (and blanks); the final blank
+    // below then runs with no ISR to race against.
     _modes[_previousModeId]->stop();
     _previousModeId = -1;
+    _laser.setLaserPower(0, 0, 0);
+  }
+  else
+  {
+    // Idle (nothing playing, nothing to stop): re-assert the blanked state
+    // about once per second as defense in depth. If anything ever leaves a
+    // colour DAC non-zero -- a glitched SPI transfer, a missed stop path -- it
+    // is extinguished within a second instead of parking a static beam. The
+    // point clock is not running here, so this write races nothing.
+    static unsigned long lastIdleBlank = 0;
+    if (millis() - lastIdleBlank >= 1000)
+    {
+      lastIdleBlank = millis();
+      _laser.setLaserPower(0, 0, 0);
+    }
   }
 }
 
 void initLaser()
 {
-  _laser.init(_watchdog);
+  // _laser.init() itself runs as the very first line of setup() (it blanks the
+  // DACs, which must never wait on the OLED/SD/network); this only does the
+  // user-visible part: center the galvos and arm the output.
   _oledModule.println(3, 15, "Init laser");
   _oledModule.displayChanges();
 
   _oledModule.println(3, 25, "Enable laser");
   _oledModule.displayChanges();
-  _laser.sendTo(0, 0);
+  _laser.writeGalvoRaw(0, 0);
   _laser.enableLasers();
 }
 
@@ -353,6 +374,23 @@ void initNetworkController()
 
 void setup()
 {
+  // FIRST: arm the watchdog and zero every DAC output. The MCP4822 DACs HOLD
+  // their last value across a CPU reset, so after a crash or watchdog reboot
+  // they may still be commanding the last lit point of a show as a static
+  // full-power beam. Nothing that can hang (OLED/I2C, SD, network, EEPROM) is
+  // allowed to run before this blank.
+  configureWatchdog();
+  _laser.init(_watchdog); // configureDacs() writes 0 to all colour DACs
+  _player.begin(_laser);
+
+  Serial.begin(9600);
+  if (CrashReport)
+  {
+    // The previous run ended in a fault -- the way a show freezes into a static
+    // beam. Print the fault details so the incident is diagnosable.
+    Serial.print(CrashReport);
+  }
+
   settingsModel settings = Settings::getSettings();
   if (settings.uuid[0] == '\0')
   {
@@ -368,12 +406,8 @@ void setup()
     _networkController.sendSettingsToController(settings);
   }
 
-  Serial.begin(9600);
-
-  configureWatchdog();
   _oledModule.init();
   initLaser();
-  _player.begin(_laser);
   _watchdog.feed();
 
   if (emergencyButtonIsPressedOrDisconnected())
