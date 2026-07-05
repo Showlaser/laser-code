@@ -115,7 +115,7 @@ void setLaserStatus(laserStatus status)
 void configureWatchdog()
 {
   WDT_timings_t config;
-  config.timeout = 10; // in seconds, 0->128
+  config.timeout = 5; // in seconds, 0->128
   _watchdog.begin(config);
 }
 
@@ -334,6 +334,8 @@ String connectionStatusToString(ConnectionStatus status)
 
 void initNetworkController()
 {
+  _watchdog.feed();
+
   // Show feedback before init(): Ethernet.begin() can block for a few seconds
   // during DHCP, and without this the OLED would still read "SD init
   // successfull", making the wait look like a hang.
@@ -348,27 +350,32 @@ void initNetworkController()
 
   _oledModule.clearDisplay();
   _oledModule.displayChanges();
+  _watchdog.feed(); // the two delay(1000)s below would exceed the 2s window back-to-back
   delay(1000);
 
-  _oledModule.println(3, 5, "Sending broadcast");
-  _oledModule.displayChanges();
-
-  _networkController.sendBroadcast();
-  if (settings.controllerIp[0] != 0 || settings.controllerIp[1] != 0 || settings.controllerIp[2] != 0 || settings.controllerIp[3] != 0)
+  if (_networkController.getConnectionStatus() == ConnectionStatus::Connected)
   {
-    _networkController.connectToController(settings.controllerIp);
-    Serial.println("Connection status: " + connectionStatusToString(_networkController.getConnectionStatus()));
-    if (_networkController.getConnectionStatus() == ConnectionStatus::Connected)
+    _oledModule.println(3, 5, "Sending broadcast");
+    _oledModule.displayChanges();
+
+    _networkController.sendBroadcast();
+    if (settings.controllerIp[0] != 0 || settings.controllerIp[1] != 0 || settings.controllerIp[2] != 0 || settings.controllerIp[3] != 0)
     {
-      _oledModule.println(3, 25, "Connected to controller using IP: " + String(settings.controllerIp[0]) + "." + String(settings.controllerIp[1]) + "." + String(settings.controllerIp[2]) + "." + String(settings.controllerIp[3]));
-    }
-    else
-    {
-      _oledModule.println(3, 25, "Could not connected to controller");
+      _networkController.connectToController(settings.controllerIp);
+      Serial.println("Connection status: " + connectionStatusToString(_networkController.getConnectionStatus()));
+      if (_networkController.getConnectionStatus() == ConnectionStatus::Connected)
+      {
+        _oledModule.println(3, 25, "Connected to controller using IP: " + String(settings.controllerIp[0]) + "." + String(settings.controllerIp[1]) + "." + String(settings.controllerIp[2]) + "." + String(settings.controllerIp[3]));
+      }
+      else
+      {
+        _oledModule.println(3, 25, "Could not connected to controller");
+      }
     }
   }
 
   _oledModule.displayChanges();
+  _watchdog.feed();
   delay(1000);
 }
 
@@ -383,6 +390,13 @@ void setup()
   _laser.init(_watchdog); // configureDacs() writes 0 to all colour DACs
   _player.begin(_laser);
 
+  // The OLED must be initialised before anything draws on it:
+  // executeEmergencyButtonProtocol() and initNetworkController() both write to
+  // the display, and Adafruit_SSD1306 only allocates its framebuffer in
+  // begin() -- drawing before that dereferences a null buffer (hard fault).
+  _oledModule.init();
+  executeEmergencyButtonProtocol();
+
   Serial.begin(9600);
   if (CrashReport)
   {
@@ -390,6 +404,8 @@ void setup()
     // beam. Print the fault details so the incident is diagnosable.
     Serial.print(CrashReport);
   }
+
+  initNetworkController();
 
   settingsModel settings = Settings::getSettings();
   if (settings.uuid[0] == '\0')
@@ -403,36 +419,26 @@ void setup()
     }
 
     Settings::saveSettings();
-    _networkController.sendSettingsToController(settings);
-  }
 
-  _oledModule.init();
-  initLaser();
-  _watchdog.feed();
-
-  if (emergencyButtonIsPressedOrDisconnected())
-  {
-    _oledModule.clearDisplay();
-    _oledModule.println(3, 3, "Emergency button pressed or disconnected!");
-    _oledModule.displayChanges();
-
-    while (true)
+    if (_networkController.getConnectionStatus() == ConnectionStatus::Connected)
     {
-      _watchdog.feed();
+      _networkController.sendSettingsToController(settings);
     }
   }
+
+  initLaser();
+  _watchdog.feed();
 
   initSDCard();
   initializeMenus();
   initializeModes();
-  initNetworkController();
 
   Serial.println("Setup started");
   Serial.println("UUID: " + String(settings.uuid));
   Serial.println("ModelType: " + String(settings.modelType));
   Serial.println("name: " + String(settings.name));
   Serial.println("Controller IP: " + String(settings.controllerIp[0]) + "." + String(settings.controllerIp[1]) + "." + String(settings.controllerIp[2]) + "." + String(settings.controllerIp[3]));
-  Serial.println("ConnectionStatus: " + String(settings.connectionStatus));
+  Serial.println("ConnectionStatus: " + String(_networkController.getConnectionStatus()));
   Serial.println("Assigned IP: " + _networkController.getAssignedIP());
 
   _menus[0]
@@ -446,12 +452,16 @@ void loop()
 
   executeEmergencyButtonProtocol();
   executeSelectedMode();
-  _networkController.listenToApiCalls();
 
-  if (millis() - _previousAliveCheck > _aliveCheckIntervalMs)
+  if (_networkController.getConnectionStatus() == ConnectionStatus::Connected)
   {
-    _networkController.laserControllerAliveCheck();
-    _previousAliveCheck = millis();
+    _networkController.listenToApiCalls();
+
+    if (millis() - _previousAliveCheck > _aliveCheckIntervalMs)
+    {
+      _networkController.laserControllerAliveCheck();
+      _previousAliveCheck = millis();
+    }
   }
 
   ConnectionStatus connectionStatus = _networkController.getConnectionStatus();

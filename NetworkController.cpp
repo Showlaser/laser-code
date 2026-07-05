@@ -59,6 +59,7 @@ bool NetworkController::laserControllerAliveCheck()
   {
     _connectionStatus = ConnectionStatus::NotConnected;
   }
+
   return alive;
 }
 
@@ -195,19 +196,21 @@ String NetworkController::generateUuid()
 bool NetworkController::sendNetworkRequest(const String &httpMethod, const String &endPoint, IPAddress &serverAddress, const String &json)
 {
   _watchdog.feed();
+
   Serial.println("Sending network request: httpMethod: " + httpMethod + " endPoint: " + endPoint + " serverAddress: " + ipToString(serverAddress));
   EthernetClient clientPost;
 
-  // Bound the blocking connect() well under the watchdog timeout (10s). connect()
+  // Bound the blocking connect() under the watchdog timeout (2s). connect()
   // does not feed our watchdog while it polls, so this value must stay low. 1500ms
-  // is enough for a real handshake (incl. first ARP) but far below the watchdog.
-  // NOTE: the library default is 10000ms, which alone equals the watchdog window.
+  // is enough for a real handshake (incl. first ARP) but below the watchdog.
+  // NOTE: the library default is 10000ms, which alone exceeds the watchdog window.
   clientPost.setConnectionTimeout(1500);
   if (!clientPost.connect(serverAddress, _tcpPort))
   {
     Serial.println("Connection to API failed");
     clientPost.stop(); // free the socket; NativeEthernet does not close it on destruction
     _watchdog.feed();
+    _connectionStatus = ConnectionStatus::NotConnected;
     return false;
   }
 
@@ -272,12 +275,15 @@ void NetworkController::init(WDT_T4<WDT1> &watchdog, SDCard &sdCard, Laser &lase
   // localIP() stays 0.0.0.0. Just after boot (or right after the cable is
   // plugged in) the link often needs a moment to negotiate, so the first
   // attempt can fail while later ones succeed. Retry until we get a valid IP.
-  const int maxDhcpAttempts = 6;
+  const int maxDhcpAttempts = 4;
   for (int attempt = 1; attempt <= maxDhcpAttempts && Ethernet.localIP() == IPAddress(0, 0, 0, 0); attempt++)
   {
     Serial.println("Requesting IP via DHCP (attempt " + String(attempt) + ")");
     _watchdog.feed();
-    Ethernet.begin(mac, 5000, 2000);
+    // begin() blocks synchronously and does not feed the watchdog, so its
+    // timeout must stay under the 2s watchdog window. A slow DHCP server gets
+    // more chances via the retry loop instead of a longer single attempt.
+    Ethernet.begin(mac, 1500, 1000);
     _watchdog.feed();
 
     if (Ethernet.localIP() == IPAddress(0, 0, 0, 0))
@@ -307,6 +313,7 @@ void NetworkController::init(WDT_T4<WDT1> &watchdog, SDCard &sdCard, Laser &lase
   _udpClient.begin(_udpPort);
   _server.begin();
   _watchdog.feed();
+  _connectionStatus = ConnectionStatus::Connected;
 }
 
 String NetworkController::onAdoptionRequest(IPAddress &serverAddress, const String &json)
@@ -913,6 +920,11 @@ String NetworkController::executeCallback(const String &httpMethod, const String
 
 void NetworkController::listenToApiCalls()
 {
+  if (_connectionStatus != ConnectionStatus::Connected)
+  {
+    return;
+  }
+
   EthernetClient client = _server.available();
   if (client)
   {
